@@ -1,0 +1,6 @@
+apiVersion: v2
+name: todo-planner
+description: API + web for the RUSH todo planner assessment
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

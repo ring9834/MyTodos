@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  # Non-secret configuration only. Genuinely sensitive values (DB connection
+  # string, JWT signing key) live in secret.yaml, never here.
+  ASPNETCORE_ENVIRONMENT: {{ .Values.environment | default "Production" | quote }}

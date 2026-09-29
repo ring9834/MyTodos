@@ -1,0 +1,35 @@
+api:
+  image:
+    repository: rushtododevacr.azurecr.io/todo-api
+    tag: latest
+  port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+web:
+  image:
+    repository: rushtododevacr.azurecr.io/todo-web
+    tag: latest
+  port: 3000
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+ingress:
+  host: 4.147.5.137.nip.io  # e.g. todo.<your-dev-ip>.nip.io for a free dev hostname
+
+# Must match the name Terraform's kubernetes_secret.todo_secrets resource creates
+# (infra/terraform/main.tf) exactly — Helm only references this Secret by name, it never
+# creates or manages it. If you ever
+# rename one side without the other, the pod fails to start with a clear "secret not found"
+# error, not a silent failure — but it IS two independently-edited strings, not something
+# Terraform and Helm coordinate automatically.
+secretsName: todo-secrets
+
+# "Staging", not "Production" — this AKS "dev" tier has no TLS configured yet, so it must NOT
+# be treated as a genuine production environment for anything that depends on that (e.g. the
+# session cookie's Secure flag, AuthController.cs). Confirmed necessary via a real bug: this
+# was silently defaulting to "Production" (configmap.yaml's fallback), causing every
+# authenticated API call to fail with 401 despite login appearing to succeed.
+environment: Staging

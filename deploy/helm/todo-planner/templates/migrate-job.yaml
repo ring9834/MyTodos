@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Fixed name (no release revision suffix) so hook-delete-policy can clean up the PREVIOUS
+  # attempt before this one is created — Kubernetes Jobs are immutable once created, so a
+  # second Job with the same name would fail outright without this.
+  name: {{ .Release.Name }}-migrate
+  annotations:
+    # Migrations run as a pre-upgrade hook, before the new
+    # Deployment revision is rolled out — never as multiple replicas racing to migrate
+    # concurrently, and never silently skipped the way Development-only auto-migrate is in
+    # every real deployed environment.
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "0"
+    # before-hook-creation: delete any leftover Job from a PREVIOUS release attempt first.
+    # hook-succeeded: also clean up THIS Job once it succeeds, so completed Jobs don't pile up.
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1 # a migration that fails once is unlikely to succeed on blind retry — fail
+                    # loudly and stop the upgrade rather than retry into a worse state
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          args: ["--migrate"]
+          # MUST match the main api-deployment.yaml's envFrom exactly — Program.cs validates
+          # Jwt:SigningKey before the --migrate check is ever reached, even though migration
+          # itself doesn't use it. Not worth refactoring around; just keep these in sync.
+          envFrom:
+            - configMapRef: { name: {{ .Release.Name }}-config }
+            - secretRef: { name: {{ .Values.secretsName }} }
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }

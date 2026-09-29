@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+spec:
+  replicas: 2   # Rolling updates need >=2 for genuine zero-downtime
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-api }
+  template:
+    metadata:
+      labels: { app: {{ .Release.Name }}-api }
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          ports: [{ containerPort: {{ .Values.api.port }} }]
+          envFrom:
+            - configMapRef: { name: {{ .Release.Name }}-config }
+            # This Secret is created and owned by Terraform — NOT by this Helm chart. Only the name is referenced here; Helm
+            # never creates, updates, or sees the values inside it. Deliberately separate
+            # ownership to avoid Helm and Terraform both trying to manage the same object.
+            - secretRef: { name: {{ .Values.secretsName }} }
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          resources: {{ toYaml .Values.api.resources | nindent 12 }}
+          # Liveness: no dependency check — a slow DB must never cause Kubernetes to kill a
+          # healthy process (that would compound an outage, not fix one).
+          livenessProbe:
+            httpGet: { path: /health/live, port: {{ .Values.api.port }} }
+            initialDelaySeconds: 5
+          # Readiness: includes the DB check — a pod that can't reach Postgres is pulled from
+          # the Service's routing instead of accepting traffic it cannot actually serve.
+          readinessProbe:
+            httpGet: { path: /health/ready, port: {{ .Values.api.port }} }
+            initialDelaySeconds: 5
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-api-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-api }

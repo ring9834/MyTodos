@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  annotations:
+    # nginx ingress: strip /api so the API's own routes stay clean (/health, not /api/health).
+    # This rewrite-target applies to BOTH rules below, not just the API one — the web rule's
+    # path must ALSO define capture groups (even an empty first one) so $2 reconstructs the
+    # full original path. A plain "/" Prefix path with no capture groups makes $2 empty for
+    # every request, rewriting EVERY web request to bare "/" regardless of what was actually
+    # asked for — silently breaking every static asset (JS chunks, CSS, fonts) since they all
+    # get served the homepage's HTML instead. Confirmed via a real browser session: every JS
+    # chunk threw "Unexpected token '<'" (HTML being parsed as JS), and CSS/fonts loaded
+    # "successfully" (200/304) while silently containing the wrong content the whole time.
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx   # confirm this matches whatever ingress controller you install
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service: { name: {{ .Release.Name }}-api, port: { number: 80 } }
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service: { name: {{ .Release.Name }}-web, port: { number: 80 } }

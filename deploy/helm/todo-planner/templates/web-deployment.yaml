@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-web
+spec:
+  replicas: 2   # ADR-0021: rolling updates need >=2 for genuine zero-downtime
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-web }
+  template:
+    metadata:
+      labels: { app: {{ .Release.Name }}-web }
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
+          ports: [{ containerPort: {{ .Values.web.port }} }]
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          resources: {{ toYaml .Values.web.resources | nindent 12 }}
+          # Next.js's standalone server may want to write a small amount of scratch data
+          # (e.g. cache) at runtime — readOnlyRootFilesystem stays true, with an explicit
+          # writable emptyDir for the one path that might need it, rather than disabling the
+          # protection entirely. Verify /tmp is actually where it writes, if anywhere.
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          # No liveness probe existed here before this step — a genuine gap: web could hang
+          # indefinitely with no restart. Same endpoint as readiness is acceptable here,
+          # since the web container has no external dependency to distinguish "alive" from
+          # "ready" the way the API's DB check does.
+          livenessProbe:
+            httpGet: { path: /, port: {{ .Values.web.port }} }
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet: { path: /, port: {{ .Values.web.port }} }
+            initialDelaySeconds: 5
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-web-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-web }
