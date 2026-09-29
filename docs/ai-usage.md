@@ -238,4 +238,24 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
   - `requirements.md` §5.3, §10.3 and §12 were updated.
   - `architecture.md` gained risk theme RT8.
 - **Note:** my manual checks mention a "register" flow, but `requirements.md` A10 says users are pre-seeded (no self-registration). _[decide: update A10 / FR-13, or rename the flow]_
+
+**design.md**
+- **Asked AI to:** create `design.md` from `requirements.md` and `architecture.md`.
+- **Contents:**
+  - domain types, the state matrix and guard and rule tables
+  - use cases with their steps
+  - the API catalogue, representations and error sources
+  - the physical schema (DDL + indexes) and EF configuration
+  - security details (JWT, `kid`, cookie, rate limit, headers)
+  - options and the `Program.cs` pipeline
+  - front-end routes, feature folders, data layer and forms
+  - Helm, Terraform, secrets and workflows
+  - the test catalogue and traceability
+- **Decisions made at design level, marked *(initial)* or noted:**
+  - rate-limit values
+  - index column order
+  - react-hook-form + zod
+  - clearing `scheduledFor` on unschedule and complete, per BR-1 as written (O2)
+  - rejecting `scheduledFor` for non-scheduled states
+- **To check myself:** _[✓]_ the DDL matches the generated migration SQL; _[✓]_ O2 and O11 resolved.
 - **Deliberate deviation to be ready to explain:** a stale `If-Match` returns **409**, not HTTP's 412, so all conflicts share one status and path through `TodoExceptionHandler` (T3). _[decide: keep 409, or switch to 412]_ _[decide: keep the broad types, or throw domain subclasses such as `TodoNotFoundException : KeyNotFoundException`]_

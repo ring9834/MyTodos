@@ -458,7 +458,8 @@ These are decisions recorded as open in the ADRs or the AI log, and document upd
 | O7 | Confirm the support window of the AKS application routing add-on | ADR-0010 R8 |
 | O8 | Confirm CodeQL availability for the repository's plan; confirm the licence claims used in tool selection | ADR-0011 R5 |
 | O9 | ADR-0011's filename (restore the original `0011-testing-and-quality-tooling.md`?) | ADR index |
-| O10 | Fill in the traceability matrix's *Design ref* column in `requirements.md` from §10 below | requirements §12 |
+| O10 | Fill in the traceability matrix's *Design ref* column in `requirements.md` from §10 below and [`design.md` §11](design.md) | requirements §12 |
+| O11 | A "register" flow was mentioned in manual checks, but A10 / FR-13 say users are pre-seeded | requirements A10, FR-13; ADR-0001; design.md §12 |
 
 ---
 
@@ -504,5 +505,6 @@ The system evolves under **one rule: everything survives N / N−1 overlap** (AD
 | [`requirements.md`](requirements.md) | Drivers: constraints, assumptions, requirements, quality attribute scenarios |
 | [`adr/README.md`](adr/README.md) | ADR index, decision map, technology summary |
 | [`adr/0001` … `0012`](adr/) | The decisions, with options, trade-offs and ATAM analysis |
+| [`design.md`](design.md) | Detailed design: domain rules, use cases, API contract, schema, security and configuration details, front end, deployment resources, test design |
 | [`ai-usage.md`](ai-usage.md) | How AI was used, what was changed or rejected, and how output was verified |
 | `runbook.md` *(to be written)* | Operations: deploy, rollback, key rotation, restore, scale, pause, teardown, platform calendar (ADR-0010 §3.12, ADR-0012 §3.7) |
