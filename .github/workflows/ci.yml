@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.401   # match your SDK; check with `dotnet --version`
+      - name: Restore
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore -c Release
+      - name: Test
+        run: dotnet test --no-build -c Release
+
+  web:
+    name: Web (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  build-and-push:
+    needs: [api, web]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: ACR login
+        run: az acr login --name rushtododevacr
+      - name: Build and push API image
+        run: |
+          docker build -t rushtododevacr.azurecr.io/todo-api:${{ github.sha }} api/
+          docker push rushtododevacr.azurecr.io/todo-api:${{ github.sha }}
+      - name: Build and push web image
+        run: |
+          docker build -t rushtododevacr.azurecr.io/todo-web:${{ github.sha }} web/
+          docker push rushtododevacr.azurecr.io/todo-web:${{ github.sha }}
+      - name: Scan API image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: rushtododevacr.azurecr.io/todo-api:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          exit-code: 1   # fail the build on a real finding — don't just report and ignore
+          trivyignores: .trivyignore
+      - name: Scan web image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: rushtododevacr.azurecr.io/todo-web:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          trivyignores: .trivyignore
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # required by actions/checkout
+      pull-requests: read # required by dorny/paths-filter
+    outputs:
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            infra:
+              - 'infra/terraform/**'
+  terraform:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: infra/terraform } }
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_USE_OIDC: true
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_db_admin_password: ${{ secrets.TF_VAR_DB_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check
+      - run: terraform init -reconfigure
+      - run: terraform validate
+      - run: terraform plan
+  helm-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/todo-planner
+      - name: Render chart
+        run: helm template deploy/helm/todo-planner --values deploy/helm/todo-planner/values.yaml > rendered.yaml
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Validate manifests (fully offline — no cluster needed)
+        run: kubeconform -strict -summary rendered.yaml
+
+  deploy-dev:
+    needs: [build-and-push, terraform, helm-check]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.build-and-push.result == 'success' &&
+      needs.helm-check.result == 'success' &&
+      (needs.terraform.result == 'success' || needs.terraform.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: dev   # add an approval gate here once you're past the skeleton stage
+    permissions: { id-token: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: azure/aks-set-context@v4
+        with: { resource-group: rush-todo-dev-rg, cluster-name: rush-todo-dev-aks }
+      - uses: azure/setup-helm@v4
+      - run: |
+          helm upgrade --install todo deploy/helm/todo-planner \
+            --set api.image.tag=${{ github.sha }} \
+            --set web.image.tag=${{ github.sha }} \
+            --atomic --timeout 5m
+      - name: Smoke test
+        run: curl -sf http://4.147.5.137.nip.io/api/health/ready
