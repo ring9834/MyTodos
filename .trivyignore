@@ -1,0 +1,14 @@
+# Every CVE below lives inside npm/yarn's own bundled internals
+# (usr/local/lib/node_modules/npm/..., opt/yarn-v1.22.22/...), shipped as part of the
+# node:22-alpine base image itself — not in our application's actual dependencies (every
+# app/node_modules/... entry scans clean, 0 findings). npm/yarn are build-time tooling only;
+# they are never invoked, imported, or reachable once the Next.js standalone server is
+# actually running. Accepted as non-exploitable in this runtime context; revisit if the base
+# image is ever changed to something that doesn't bundle npm/yarn (e.g. a distroless variant).
+CVE-2026-13149
+CVE-2026-14257
+CVE-2026-69152
+CVE-2026-69192
+CVE-2026-9496
+CVE-2026-33671
+CVE-2026-48815
