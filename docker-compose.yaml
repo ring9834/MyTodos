@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tododb
+      POSTGRES_USER: todo
+      POSTGRES_PASSWORD: localdevonly
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U todo -d tododb"] # pg_isready (like most libpq-based tools) defaults the target database name to the username when you don't pass -d explicitly. So -U todo with no -d means it's trying to connect to a database literally named todo
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    environment:
+      ConnectionStrings__Default: "Host=postgres;Database=tododb;Username=todo;Password=localdevonly"
+      ASPNETCORE_ENVIRONMENT: Development
+    ports: ["5000:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    environment:
+      # server-side fetches (if any) hit the api container by name; browser hits it via the
+      # dev proxy / same-origin path once ingress-equivalent routing exists locally
+      NEXT_PUBLIC_API_BASE: "/api"
+    ports: ["3000:3000"]
+    depends_on: ["api"]
+
+volumes:
+  pgdata:
