@@ -230,8 +230,10 @@ Every deferred item in one place. **Triggers are observable.** Each item has a f
 | V16 | **Canary releases, staging, GitOps** | Real traffic; more than one team | Staging values file; NGINX / Gateway canary weights; Flux | 0010 | M |
 | V17 | **Observability beyond export** (dashboards, alerts, front-end real-user monitoring) | Going beyond the demo | Enable the defined alert rules; add web RUM | 0008 | S |
 | V18 | **Authentication audit log** | Real users (ADR-0008 R10) | A dedicated audit sink for sign-in events | 0001, 0008 | S |
-| V19 | **MSW for front-end tests** | The ADR-0011 D5 trigger | Handlers generated from the OpenAPI types | 0011 | S |
+| V19 | **MSW for front-end tests** | The ADR-0011 D5 trigger (duplicated mocks, contract drift, complex request/response sequences) | Replace `vi.stubGlobal("fetch")` stubs with handlers generated from the OpenAPI types | 0011 | S |
 | V20 | **Localisation** | Non-English users | Map error `code`s and UI strings to translations | 0008, 0009 | M |
+| V21 | **End-to-end browser automation** (Playwright + `@axe-core/playwright`) | The ADR-0011 D6 trigger: frequent manual checks, a full-stack regression escaping, several people changing the UI | Automate the release checklist journeys against Docker Compose and after deploy | 0010, 0011 | M |
+| V22 | **Load and performance test automation** (k6, Lighthouse CI) | The ADR-0011 D7 trigger: before real traffic, a latency complaint, or a data-access or scaling change | k6 scripts for Q3, Q4, Q7 with thresholds; Lighthouse CI for Web Vitals | 0003, 0004, 0011 | M |
 
 **Keeping the register current:**
 - Every new ADR adds its deferred items here.

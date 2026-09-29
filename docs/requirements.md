@@ -4,6 +4,9 @@
 |---|---|
 | **Status** | Baselined for MVP; assumptions pending product-owner confirmation |
 | **Last updated** | 2026-09-29 |
+| **Sources** | `1. Business requirements.docx`, `2. Interview notes.docx` |
+
+> **Scope of this document:** *what* the system must do and *why*. *How* it is built (technology selection, API contract, physical data model, authentication mechanism, deployment design) is covered in the design documents under `docs/design/` and `docs/adr/`.
 
 ---
 
@@ -21,7 +24,7 @@ The brief is deliberately larger than the time available, so this document does 
 
 ## 2. Constraints
 
-### Technical constraints (from the business requirements)
+### 2.1 Technical constraints (from the business requirements)
 
 | ID | Constraint | Options allowed | Source |
 |---|---|---|---|
@@ -35,6 +38,20 @@ The brief is deliberately larger than the time available, so this document does 
 | C-8 | Quality bar | Production-ready; tests are required even though they are not listed as a task | Business requirements |
 
 Selecting among the allowed options for C-1, C-2 and C-4 is a design decision, recorded in the ADRs. The allowed options for C-2 depend on the role type (A0).
+
+### 2.2 Process constraints (from the interview notes)
+
+These are not product requirements, but they create requirements of their own.
+
+| ID | Constraint | Resulting requirement |
+|---|---|---|
+| P-1 | The solution must compile and run at the start of the interview | NFR-7 (one-command local run); a working cloud deployment |
+| P-2 | Back-end and front-end changes will be made live **without AI** | Q5 (modifiability) |
+| P-3 | Must explain the architecture and the code | Documented design decisions; code structure that matches the documented architecture |
+| P-4 | Must demonstrate good AI-enabled engineering practice | A log of AI usage and verification (`docs/ai-usage.md`) |
+| P-5 | Free-trial cloud budget and quotas | NFR-8 (cost) |
+| P-6 | Scope intentionally exceeds the time available | Explicit prioritisation (section 9) |
+| P-7 | Demo via Google Meet screen-share | The UI must be demonstrable from a single desktop screen |
 
 ---
 
@@ -176,11 +193,11 @@ The key quality attributes are stated as testable scenarios. **Priority** is wri
 |---|---|---|---|---|---|---|
 | Q1 | Security (isolation) | Signed-in user A reads, edits or deletes user B's item using a guessed or known identifier (normal operation) | The request is treated exactly as if the item did not exist; B's item is unchanged; A's list never includes B's items | 100% of cross-user attempts are indistinguishable from "not found"; no existence is leaked | H/H | API integration tests covering read, edit, delete and list |
 | Q2 | Correctness (state rules) | A client attempts an illegal transition, e.g. `done → scheduled` or `todo → done` (normal operation) | The request is rejected with an error explaining the rule; the item's state is unchanged | All illegal transitions in the section 3.3 matrix are rejected; all legal ones succeed | H/H | Unit tests over every from/to pair; API integration test |
-| Q3 | Performance | A user with 1,000+ items lists them, filtered by state, one page at a time (normal load, local environment) | Results are returned, correctly filtered and paged | p95 response time under 200 ms | H/M | Automated test with seeded data, measuring p95 |
-| Q4 | Availability (deployment) | A new version is deployed while the API is receiving steady traffic | The service stays available throughout; a failed release is rolled back automatically | Zero failed requests during a successful rollout; the previous version is restored after a failed one | M/M | Deployment drill: continuous smoke traffic during an upgrade, plus a deliberately failing release |
+| Q3 | Performance | A user with 1,000+ items lists them, filtered by state, one page at a time (normal load, local environment) | Results are returned, correctly filtered and paged | p95 response time under 200 ms | H/M | Deterministic query-plan integration test with seeded data + observed p95 in telemetry (load-test automation deferred, ADR-0011 D7) |
+| Q4 | Availability (deployment) | A new version is deployed while the API is receiving steady traffic | The service stays available throughout; a failed release is rolled back automatically | Zero failed requests during a successful rollout; the previous version is restored after a failed one | M/M | Manual deployment drill: a request loop during an upgrade, plus a deliberately failing release |
 | Q5 | Modifiability | A developer adds a new field to Todo items end to end (storage, API, UI, tests) | The change is completed without AI assistance, and all tests pass | Under 30 minutes | M/L | Timed manual drill |
 | Q6 | Data integrity | Two clients update the same item concurrently | The first write is kept; the second is rejected, and that user is told the item changed | 0 silently lost updates | M/M | API integration test |
-| Q7 | Scalability | Request volume grows to 10× normal (e.g. many users planning their day at the same morning peak) | Capacity is increased by running more API instances, with no code change and no user-visible errors | Throughput scales roughly linearly from 1 to 3 instances, while Q3's p95 target is still met | H/L | Load test at 1 and 3 instances |
+| Q7 | Scalability | Request volume grows to 10× normal (e.g. many users planning their day at the same morning peak) | Capacity is increased by running more API instances, with no code change and no user-visible errors | Throughput scales roughly linearly from 1 to 3 instances, while Q3's p95 target is still met | H/L | HPA configuration review + manual scale drill; throughput measurement deferred (ADR-0011 D7) |
 | Q8 | Security (authentication) | An unauthenticated caller, or one with an expired or invalid credential, calls any Todo operation | The request is rejected, and no data is returned or changed | 100% of such requests are rejected | H/L | API integration tests without, and with invalid, credentials |
 
 ---
@@ -250,7 +267,7 @@ This model describes the business information only. Physical details (identifier
 ### 10.2 In scope (MVP)
 
 - FR-1 to FR-10, with FR-11 if time allows.
-- Q1 to Q8. Q4 and Q7 are verified by drills rather than automated tests.
+- Q1 to Q8. Q3 is verified by a deterministic query-plan test and telemetry; Q4 and Q7 by manual drills rather than load-test automation (ADR-0011 D7).
 - The NFRs marked Must, and as many of those marked Should as time allows.
 - Local run, cloud infrastructure from code, Kubernetes hosting via Helm, and an automated test-and-deploy pipeline.
 
@@ -266,7 +283,8 @@ This model describes the business information only. Physical details (identifier
 | Route suggestion (FR-16) | A separate problem domain |
 | Private network isolation of the database | Adds significant networking setup time |
 | Advanced monitoring (tracing, metrics) | Logs and health signals cover the basics for the MVP |
-| Automated end-to-end browser tests | Lower value per hour than API-level tests |
+| Automated end-to-end browser tests (Playwright) | Lower value per hour than component and API-level tests; full-stack journeys are checked manually (ADR-0011 D6) |
+| Load and performance test automation (k6, Lighthouse CI) | Q3, Q4 and Q7 are verified by deterministic checks, telemetry and manual drills for the MVP (ADR-0011 D7) |
 
 How each deferred item would be added is covered in the architecture document.
 
@@ -303,11 +321,11 @@ This matrix links each requirement to its source and to how it will be verified.
 | FR-10, FR-11 | A1 | US-6; manual check | *Phase 1* | ☐ |
 | Q1 | A4 | API integration tests | *Phase 1* | ☐ |
 | Q2 | A3 | Unit tests over all transitions; API test | *Phase 1* | ☐ |
-| Q3 | Scenario, C-8 | Automated performance test | *Phase 1* | ☐ |
+| Q3 | Scenario, C-8 | Query-plan integration test + observed p95 | *Phase 1* | ☐ |
 | Q4 | C-6, C-7 | Deployment drill | *Phase 1* | ☐ |
 | Q5 | P-2 | Timed manual drill | *Phase 1* | ☐ |
 | Q6 | C-8 | API integration test | *Phase 1* | ☐ |
-| Q7 | C-6 | Load test at 1 and 3 instances | *Phase 1* | ☐ |
+| Q7 | C-6 | HPA review + manual scale drill | *Phase 1* | ☐ |
 | Q8 | A4, A6 | API integration tests | *Phase 1* | ☐ |
 | NFR-1 to NFR-3 | C-8 | Pipeline test stage; API tests | *Phase 1* | ☐ |
 | NFR-4 | C-5 | Re-apply shows no drift | *Phase 1* | ☐ |

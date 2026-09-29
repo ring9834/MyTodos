@@ -106,14 +106,14 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
 - **Asked AI to:** decide the performance approach across the front end, API, database and cloud, including rendering pattern, caching, concurrency, and TanStack Query vs Redux.
 - **Accepted:** the principle "proven defaults, measure, then optimise"; static shell + client data fetching; TanStack Query; client-side and static-asset caching only; async I/O; one API service; owner-first indexes.
 - **Checked:** the derived budgets (other than Q3) are marked as design choices, not requirements. _[fill in: do you agree with them?]_
-- **Verified by:** _[✓ when done]_ the Q3 latency test and the load test in ADR-0003 §6.
+- **Verified by:** _[✓ when done]_ the Q3 query-plan test and the telemetry p95 check in ADR-0003 §6 (load tests deferred, ADR-0011 D7).
 - **Follow-up question I raised (ADR-0003 §3.7):** does read performance need CQRS? Added ADR-0003 §3.7. The answer is no, with the CQRS spectrum explained: only light command/query separation in code is adopted, and separate read models are rejected because of freshness (read-your-writes), identical read and write shapes, and modifiability. Explicit triggers to revisit are recorded.
 
 **ADR-0004 (Quality Attributes → Scalability)**
 - **Asked AI to:** decide the scalability approach across the front end, back end, database and cloud, including REST vs GraphQL vs MVC, async messaging, horizontal vs vertical scaling and autoscaling, and monolith vs microservices.
 - **Accepted:** X-axis scaling of stateless tiers; a vertical database with a bounded replica rule; CPU-based HPA (min 2, bounded max); REST; synchronous only; a modular monolith.
 - **Checked:** the workload figures in §1.3 are marked as assumptions, not requirements; the connection-limit numbers are illustrative. _[fill in: replace with the real tier limit once chosen]_
-- **Verified by:** _[✓ when done]_ the load test, HPA drill and statelessness check in ADR-0004 §6.
+- **Verified by:** _[✓ when done]_ the manual scale drill, HPA review and statelessness check in ADR-0004 §6.
 
 **ADR-0005 (Quality Attributes → Testability and maintainability)**
 - **Asked AI to:** decide on SOLID, DI, Moq and mocking, design patterns, and whether "add a status easily" belongs in scope.
@@ -226,4 +226,16 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
   - requirements → design traceability
 - **Rule stated in the document:** if it disagrees with an ADR, the ADR wins.
 - **To do myself:** _[✓]_ check every diagram against the code as it's built; _[✓]_ resolve open items O1–O10 (§9).
+
+**Decision by me: no Playwright and no k6 this time (ADR-0011 D6, D7)**
+- **What's explicitly deferred, and why:**
+  - **MSW:** front-end component tests stub `fetch` directly (`vi.stubGlobal("fetch", vi.fn())`) rather than intercepting at the network layer. This is simpler for the current scope, and MSW is the natural upgrade for more complex request/response sequences.
+  - **No end-to-end browser automation** (Playwright, Cypress, …). Automated testing stops at the component level on the front end (Vitest + Testing Library) and the integration level on the back end (Testcontainers + `WebApplicationFactory`). There's no automated test that drives a real browser through the full stack; those journeys are verified manually, as they have been throughout the deployment work.
+  - **No load-test automation** (k6, Lighthouse CI). Q3 is verified by a deterministic query-plan test plus telemetry; Q4 and Q7 by manual drills.
+- **Consequential updates:**
+  - ADR-0011 gained D6 and D7, updated CI stages and verification map, and new risks R7 and R8.
+  - ADR-0003, 0004, 0005, 0010 and 0012 were updated; the register gained V21 (Playwright) and V22 (k6) with triggers.
+  - `requirements.md` §5.3, §10.3 and §12 were updated.
+  - `architecture.md` gained risk theme RT8.
+- **Note:** my manual checks mention a "register" flow, but `requirements.md` A10 says users are pre-seeded (no self-registration). _[decide: update A10 / FR-13, or rename the flow]_
 - **Deliberate deviation to be ready to explain:** a stale `If-Match` returns **409**, not HTTP's 412, so all conflicts share one status and path through `TodoExceptionHandler` (T3). _[decide: keep 409, or switch to 412]_ _[decide: keep the broad types, or throw domain subclasses such as `TodoNotFoundException : KeyNotFoundException`]_

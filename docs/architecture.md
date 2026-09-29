@@ -27,7 +27,7 @@
 | Observability | **OpenTelemetry instrumentation first**; the only `ILogger` call is in `TodoExceptionHandler` | [0008](adr/0008-cross-cutting-concerns.md) |
 | Hosting | AKS (Cilium network policies, workload identity), **NGINX Ingress** (AKS application routing add-on), cert-manager + Let's Encrypt | [0010](adr/0010-deployment-and-operations.md) |
 | Delivery | GitHub Actions (OIDC, no stored cloud secrets); SHA-tagged images; **API released before web**; rolling updates with `helm --atomic` | [0010](adr/0010-deployment-and-operations.md) |
-| Testing | xUnit v3 + Testcontainers (real PostgreSQL, real login); Vitest + Testing Library (`fetch` mocks); Playwright; k6 | [0011](adr/0011-testability-strategy-and-testing-tooling.md) |
+| Testing | xUnit v3 + Testcontainers (real PostgreSQL, real login); Vitest + Testing Library (stubbed `fetch`); **no browser or load-test automation for now:** full-stack journeys checked manually | [0011](adr/0011-testability-strategy-and-testing-tooling.md) |
 | Evolution | The N / N−1 compatibility rule; additive API enforced by `oasdiff`; forward-only migrations | [0012](adr/0012-evolution-and-extensibility.md) |
 
 ---
@@ -71,7 +71,7 @@ These principles recur across the ADRs. They are the shortest way to explain *wh
 | P4 | **Everything survives N / N−1 overlap:** API, schema, tokens, configuration | Expand/contract, additive contract, API-first deploys, `kid` rotation (0006, 0009, 0010, 0012) |
 | P5 | **Build once, deploy many** | Immutable SHA images; configuration per environment; no environment values baked into the bundle (0008, 0010) |
 | P6 | **Instrumentation first; one log call at the one chokepoint** | OpenTelemetry for requests and database calls; one `ILogger` in `TodoExceptionHandler` (0008) |
-| P7 | **Test against the real thing** | Real PostgreSQL, real login, real HTTP pipeline; no mocked ORM (0005, 0011) |
+| P7 | **Test against the real thing, at the right level** | Real PostgreSQL, real login, real HTTP pipeline; no mocked ORM. Automation stops at the component and integration levels; full-stack journeys are checked by hand (0005, 0011) |
 | P8 | **Make foreseeable change cheap; defer the rest behind observable triggers** | Nine extension points; the evolution register (0012) |
 
 ---
@@ -171,7 +171,7 @@ flowchart TB
 ```mermaid
 flowchart TB
     subgraph GH[GitHub]
-        CI[ci.yml: static · unit · integration · e2e]
+        CI[ci.yml: static · unit · integration]
         DEP[deploy.yml: build → secrets → todo-api → smoke → todo-web → smoke]
         INF[infra.yml: terraform plan / apply]
         PLT[platform.yml: cert-manager · issuer · certificate · DB roles]
@@ -333,11 +333,11 @@ sequenceDiagram
 |---|---|---|---|---|
 | **Q1 Isolation** | Authorize by default; limit exposure; no leakage | Deny-by-default fallback policy; **global owner filter**; owner only from the token; 404 not 403; UUID v7 ids; no `IgnoreQueryFilters` | Integration tests (alice/bob) through the real login; ArchUnitNET | 0001, 0006, 0009, 0011 |
 | **Q2 State rules** | A single source of rules | `TodoTransitions` table in Domain; `allowedTransitions` served to the UI; `PUT …/state` only | `[Theory]` over every pair + a completeness test | 0005, 0007, 0009 |
-| **Q3 Performance** | Reduce demand; efficient queries; client caching | Owner-first indexes; paging ≤ 100; projection + no tracking; static shell; TanStack Query cache; no server caches | k6 `p(95)<200`; query-plan review | 0003, 0006, 0011 |
-| **Q4 Availability** | Redundancy; health monitoring; safe change | Min 2 replicas; readiness/liveness; PDB; graceful shutdown; rolling + `--atomic`; expand/contract; API first; fail-fast config | k6 during `helm upgrade`; a deliberately failing release | 0004, 0008, 0010, 0012 |
+| **Q3 Performance** | Reduce demand; efficient queries; client caching | Owner-first indexes; paging ≤ 100; projection + no tracking; static shell; TanStack Query cache; no server caches | Query-plan integration test (deterministic); observed p95 in telemetry | 0003, 0006, 0011 |
+| **Q4 Availability** | Redundancy; health monitoring; safe change | Min 2 replicas; readiness/liveness; PDB; graceful shutdown; rolling + `--atomic`; expand/contract; API first; fail-fast config | Manual drill: a request loop during `helm upgrade`; a deliberately failing release | 0004, 0008, 0010, 0012 |
 | **Q5 Modifiability** | Cohesion; limited ceremony; foreseen extension points | Clean Architecture with guardrails; controllers bind commands; generated TS types; transition table | Timed drills: add a field (~12 files), add a status (~5) | 0005, 0007, 0012 |
 | **Q6 Data integrity** | Optimistic concurrency; integrity backstop | `xmin` + `If-Match`; `CHECK` constraints; 409 on conflict | Integration tests against real PostgreSQL | 0006, 0009, 0011 |
-| **Q7 Scalability** | Stateless horizontal scaling | JWT sessions; no per-instance state; HPA (CPU 70%, max bounded by DB connections); async I/O | k6 at 1 vs 3 replicas; HPA drill | 0003, 0004 |
+| **Q7 Scalability** | Stateless horizontal scaling | JWT sessions; no per-instance state; HPA (CPU 70%, max bounded by DB connections); async I/O | HPA configuration review; manual scale drill (throughput measurement deferred) | 0003, 0004 |
 | **Q8 Authentication** | Authenticate actors | PBKDF2; JWT (HS256, `kid`, 8 h); `HttpOnly` / `Secure` / `SameSite=Strict` cookie; rate-limited login | Integration tests (no, expired or tampered token, `alg: none`) | 0001, 0012 |
 | **NFR-3 Errors** | One contract | Built-in ProblemDetails; `TodoExceptionHandler`; `code`; no `traceId` | Integration tests for every status | 0008, 0009 |
 | **NFR-6 Observability** | Instrumentation first | OpenTelemetry (ASP.NET Core, Npgsql, HttpClient, runtime); a single `ILogger` call; export required in Production | `FakeLogger` tests; the Aspire dashboard locally | 0008, 0011 |
@@ -373,7 +373,7 @@ sequenceDiagram
 | Data | PostgreSQL (Azure Flexible Server) |
 | Platform | AKS (Azure CNI Overlay + Cilium), NGINX Ingress (application routing add-on), cert-manager, Let's Encrypt, ACR, Key Vault, Azure Monitor / Application Insights |
 | Delivery | Terraform (`azurerm`), Helm (two app charts), GitHub Actions (OIDC), Docker multi-stage (chiseled / minimal images) |
-| Testing | xUnit v3, Shouldly, Testcontainers, Respawn, `FakeLogger`, `FakeClock`, ArchUnitNET, Vitest, Testing Library, vitest-axe, Playwright, k6, Lighthouse CI, size-limit |
+| Testing | xUnit v3, Shouldly, Testcontainers, Respawn, `FakeLogger`, `FakeClock`, ArchUnitNET, Vitest, Testing Library, vitest-axe, size-limit. **Deferred:** Playwright, k6, Lighthouse CI, MSW |
 | Quality and security | Analysers + warnings as errors, ESLint, Prettier, `oasdiff`, gitleaks, Trivy, Dependabot, CodeQL (where available), tflint, kubeconform |
 
 Full list with sources: [ADR index → Technology summary](adr/README.md).
@@ -416,7 +416,7 @@ Full list with sources: [ADR index → Technology summary](adr/README.md).
 
 ### 8.3 Risk themes
 
-Individual risks recorded across the ADRs cluster into **seven themes**. A theme is where one root cause appears in several places, so it deserves one coordinated response.
+Individual risks recorded across the ADRs cluster into **eight themes**. A theme is where one root cause appears in several places, so it deserves one coordinated response.
 
 | Theme | Root cause | Contributing risks | Response |
 |---|---|---|---|
@@ -426,6 +426,7 @@ Individual risks recorded across the ADRs cluster into **seven themes**. A theme
 | **RT4: Deferred security hardening** | An MVP identity and secrets model | No MFA or reset (0001 R2); 8 h token exposure (0001 R1); Kubernetes Secrets (0001 R4); privileged DB user (0001 R6, resolved by the three roles in 0006); no sign-in audit log (0008 R10) | Federation + BFF, Key Vault CSI, RLS and an auth audit log: evolution register V1, V2, V18. Triggered by real users or data |
 | **RT5: Observability gaps** | Instrumentation-first with alerts deferred | No active alerting except cost (0008 R1); blind if export is off (0008 R9); no user-facing trace id (0008 R8) | Export required in Production (fail fast); alert rules defined and ready (V17); search telemetry by time, user and route |
 | **RT6: Ageing or retired dependencies and licences** | Third-party lifecycle | The retired ingress-nginx upstream (0010 R8); Next.js server-side surface (0002 R1); licence changes (0011 R6); platform end-of-support (0012 R4) | Managed add-on; no snippets; Gateway API migration (V15); Dependabot; the quarterly platform calendar |
+| **RT8: Verification by hand, not by CI** | Deliberately deferred browser and load-test automation (ADR-0011 D6, D7) | Full-stack regressions found only by manual checks (0011 R7); performance regressions unnoticed until felt (0011 R8) | Post-deploy `curl` smoke checks; a manual release checklist; the deterministic Q3 query-plan test; telemetry p95 and the defined latency alert; triggers V21 (Playwright) and V22 (k6) |
 | **RT7: Live-change and demo readiness** | The interview format (P-1, P-2) | More files per change with layering (0007 R1); Docker unavailable (0011 R1); pipeline or OIDC misconfigured on the day (0010 R7) | Rehearse the drills (add a field, add a status); unit tests run without Docker; run the full pipeline end to end beforehand; `Todo.Api.http` for manual checks |
 
 ### 8.4 Selected non-risks
@@ -469,8 +470,8 @@ These are decisions recorded as open in the ADRs or the AI log, and document upd
 | FR-2 to FR-6 CRUD | 0007 (use cases); 0009 §3.3 (rows 4–9) | Integration tests |
 | FR-7 state changes from the list | 0005 §3.6; 0009 `PUT …/state`; 0003 optimistic UI | Unit + component tests |
 | FR-8 / BR-1 to BR-6 business rules | 0005 §3.6; 0006 §3.6; 0007 §3.8; 0008 §3.7 | `[Theory]` domain tests; constraint tests |
-| FR-9 filters + paging | 0003 §3.8; 0009 §3.4 | Integration tests; k6 |
-| FR-10 / FR-11 maps | 0003 (lazy map); 0011 (Playwright) | Playwright |
+| FR-9 filters + paging | 0003 §3.8; 0009 §3.4 | Integration tests; the Q3 query-plan test |
+| FR-10 / FR-11 maps | 0003 (lazy map); 0011 D6 | Manual release checklist |
 | Q1–Q8 | §5 of this document | §5 of this document |
 | NFR-1 testability | 0005, 0011 | CI stages (0011 §3.6) |
 | NFR-2 / NFR-3 validation and errors | 0008 §3.5–§3.7 | Integration tests |
@@ -479,7 +480,7 @@ These are decisions recorded as open in the ADRs or the AI log, and document upd
 | NFR-6 observability | 0008 §3.1–§3.4 | `FakeLogger` tests; Aspire dashboard |
 | NFR-7 one-command local run | 0010 §3.9 | `docker compose up` |
 | NFR-8 cost | 0008 (budget alert); 0010 §3.12 | Budget in `terraform plan` |
-| NFR-9 accessibility | 0011 (axe) | vitest-axe, `@axe-core/playwright` |
+| NFR-9 accessibility | 0011 (axe) | vitest-axe; manual keyboard check |
 | NFR-10 HTTPS | 0001; 0010 §3.2 | Smoke test (TLS, redirect) |
 
 ---

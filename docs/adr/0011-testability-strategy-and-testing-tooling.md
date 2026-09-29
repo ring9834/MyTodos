@@ -1,6 +1,6 @@
 # ADR-0011: Testability strategy and testing tooling
 
-The strategy: no generic repository layer; Testcontainers for integration tests; real authentication in tests; one narrow `IClock` port; a deferred front-end mocking library. The ADR also selects the testing tools.
+The strategy: no generic repository layer; Testcontainers for integration tests; real authentication in tests; one narrow `IClock` port; a deferred front-end mocking library; **no browser automation and no load-test automation for now**. The ADR also selects the testing tools.
 
 | | |
 |---|---|
@@ -104,22 +104,78 @@ public sealed class FakeClock(DateTimeOffset now) : IClock { public DateTimeOffs
 ### D5. Front end: mock `fetch` directly; defer MSW
 
 **Options:**
-- (a) hand-mock `fetch` per test (`vi.spyOn(globalThis, 'fetch')`)
+- (a) hand-mock `fetch` per test (`vi.stubGlobal("fetch", vi.fn())`)
 - (b) adopt MSW (Mock Service Worker) for realistic network-layer interception
 
 **Decision: (a) for now,** with (b) as a **deferred, triggered upgrade**. This is the same pattern as ADR-0003 (caching and CQRS) and ADR-0004 (messaging): don't adopt pre-emptively for a component set this small.
 
 **How it stays consistent with ADR-0005 ("mock at the boundary, not modules"):**
-- Tests spy on the **global `fetch`** only. Components still run their **real TanStack Query hooks and the real fetch wrapper** (`web/src/lib/api`), so request building, `If-Match` headers and ProblemDetails parsing are all exercised.
+- Tests **stub the global `fetch`** only (`vi.stubGlobal("fetch", vi.fn())`). Components still run their **real TanStack Query hooks and the real fetch wrapper** (`web/src/lib/api`), so request building, `If-Match` headers and ProblemDetails parsing are all exercised.
 - **Hooks and API modules are never mocked** with `vi.mock`. The only justified module mock is the Leaflet map stub (§3.5).
 - **Small typed helpers** in `web/src/test-setup.ts` build responses, e.g. `jsonResponse(body, init)` and `problemResponse(status, code, errors?)`, so tests stay short and the ADR-0008 error contract is used consistently.
 
 **Trigger for adopting MSW:** once **enough test files need consistent, shared request mocking that the hand-rolled mocks start actively hurting maintainability.** Concrete signals:
 - the same endpoint's mock is duplicated across several test files
 - mocks drift from the OpenAPI contract
-- network mocking is also wanted in the browser during development or in Playwright
+- network mocking is also wanted in the browser during development
 
-Handlers could then be derived from the generated OpenAPI types (ADR-0009).
+Handlers could then be derived from the generated OpenAPI types (ADR-0009). MSW is also the natural upgrade if front-end tests need to simulate **more complex request/response sequences** than per-test stubs express well.
+
+### D6. No end-to-end browser automation (Playwright, Cypress, …); full-stack journeys are checked manually
+
+**Options:**
+- (a) Playwright or Cypress journeys against the local stack and after each deploy
+- (b) **stop automated testing at the component level (front end) and the integration level (back end),** and check full-stack journeys by hand
+
+**Decision: (b), for now.** Automated testing covers two levels:
+- **Front end:** components with Vitest + Testing Library, with the real hooks and fetch wrapper against a stubbed `fetch` (D5).
+- **Back end:** integration tests through the real HTTP pipeline with `WebApplicationFactory` + Testcontainers + the real login (D2, D3).
+
+There is **no automated test that drives a real browser through the full stack.** That verification is done **manually**: the key journeys are checked by hand in the browser, locally and after deployments, as they have been throughout the project's deployment work.
+
+**Why this is right-sized here:**
+- The behaviour worth protecting (rules, isolation, concurrency, the error contract) is already covered below the browser, at lower cost and with less flakiness.
+- The full-stack *wiring* (ingress, TLS, routing, cookies) is covered by the scripted `curl` smoke checks after each deploy (ADR-0010 §3.4), which don't need a browser.
+- A browser suite adds a runtime, browser installs in CI, flakiness management and maintenance for a small UI.
+
+**What is checked manually** (the release checklist in `docs/runbook.md`):
+
+| Journey | Checks |
+|---|---|
+| Sign in → list → create → schedule → complete → delete → sign out | The whole happy path through the real browser, ingress and database |
+| Two users (`alice` / `bob`) | Neither sees the other's items in the UI (the API-level isolation is already automated) |
+| Map picker and day map (FR-10, FR-11) | Leaflet renders; picking a point sets the coordinates |
+| Keyboard-only use of the list and form (NFR-9) | Complements the automated axe checks at component level |
+| An open tab across a deploy (ADR-0012 §3.6) | Stale-chunk reload works |
+
+**Trigger to introduce Playwright** (the preferred tool if adopted, for its traces and parallelism):
+- the manual checklist becomes frequent or time-consuming
+- a regression reaches production that component and integration tests couldn't catch
+- more than one person changes the UI
+
+### D7. No automated load or performance testing (k6, Lighthouse CI) for now
+
+**Options:**
+- (a) scripted load tests (k6) with thresholds, and Lighthouse CI for Web Vitals
+- (b) **verify the performance-related scenarios with deterministic checks, telemetry and manual drills,** and defer load-test automation
+
+**Decision: (b), for now.**
+
+| Scenario | How it's verified instead |
+|---|---|
+| **Q3** list p95 < 200 ms | A **deterministic integration test**: 1,000+ seeded items; the list query's plan (`EXPLAIN`) uses the owner-first index; results are bounded by the page size. Plus the **observed p95** of `http.server.request.duration` for the list route in telemetry (ADR-0008) during manual use |
+| **Q4** zero failed requests during a rollout | A **manual deployment drill**: a simple request loop (e.g. `curl` in a shell loop) during `helm upgrade`, counting non-2xx responses; plus a deliberately failing release to confirm `--atomic` rolls back |
+| **Q7** scale-out | **Configuration review** (HPA bounds, statelessness checklist, ADR-0004 §3.1) + a **manual scale drill** (`kubectl scale` to 3 replicas; delete a pod while using the app). Throughput measurement is deferred |
+| Front-end budgets (ADR-0003) | **size-limit** stays in CI (build-time, deterministic). Web Vitals are checked with a manual Lighthouse run in the browser's developer tools |
+
+**Why:**
+- At MVP volume, the performance design rests on structural choices (indexes, paging, no N+1, async I/O) that can be verified **deterministically**.
+- Latency thresholds measured on shared CI runners or a burstable trial cluster would be noisy (ADR-0003 R1, R2).
+
+**Trigger to introduce k6** (and Lighthouse CI):
+- before real production traffic
+- a latency complaint, or the telemetry p95 approaching its budget
+- a change to the data-access or scaling design (e.g. a cache, a read replica, new indexes)
 
 ---
 
@@ -148,17 +204,17 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | **Real database** | **Testcontainers for .NET** (PostgreSQL module), **one container per run** (D2) | EF in-memory, SQLite, a shared development database |
 | **Reset between tests** | **Respawn** (deletes rows, keeps the schema) | A container per test (slow); a transaction per test (hides commit-time behaviour such as `xmin` conflicts) |
 | **Authentication in tests** | **The real login endpoint** with seeded users (D3) | Fake authentication handlers; bypass flags |
-| **Test data** | **Hand-written builders**; **Bogus** only for bulk seed data in performance tests | AutoFixture |
+| **Test data** | **Hand-written builders**; a simple loop for the 1,000+ items in the Q3 query-plan test | AutoFixture; Bogus (not needed without load tests) |
 | **Architecture tests** | **ArchUnitNET** | NetArchTest |
 | **Outbound HTTP simulation** (future geocoding) | **WireMock.Net** (added when the first outbound dependency arrives) | Mocking `HttpClient` |
 | **Coverage** (informational) | **coverlet** + **ReportGenerator** | A coverage gate (ADR-0005) |
 | **Front-end runner** | **Vitest** (jsdom) | Jest |
 | **Front-end components** | **React Testing Library** + user-event + jest-dom | Enzyme; shallow rendering |
-| **Front-end network** | **`vi.spyOn(globalThis, 'fetch')`** + typed response helpers (D5) | **MSW: deferred** with a trigger; `vi.mock` of hooks or API modules |
-| **Accessibility** | **vitest-axe** (components) and **`@axe-core/playwright`** (end-to-end) | Manual checks only |
-| **End-to-end** | **Playwright** | Cypress, Selenium |
-| **Performance and load** | **k6** (thresholds encode Q3, Q4 and Q7; nightly and on demand, not a PR gate) | NBomber, JMeter, BenchmarkDotNet |
-| **Front-end budgets** | **size-limit** (PR) + **Lighthouse CI** (nightly) | Manual runs |
+| **Front-end network** | **`vi.stubGlobal("fetch", vi.fn())`** + typed response helpers (D5) | **MSW: deferred** with a trigger; `vi.mock` of hooks or API modules |
+| **Accessibility** | **vitest-axe** (components) + a manual keyboard check (D6) | `@axe-core/playwright` (deferred with Playwright) |
+| **End-to-end / browser automation** | **None for now:** manual journey checks (D6); scripted `curl` smoke checks after deploy (ADR-0010) | Playwright (**deferred**, the preferred tool when triggered); Cypress, Selenium |
+| **Performance and load** | **None automated for now:** a deterministic query-plan test for Q3, telemetry p95, manual drills for Q4 and Q7 (D7) | k6 (**deferred**, the preferred tool when triggered); NBomber, JMeter, BenchmarkDotNet |
+| **Front-end budgets** | **size-limit** (PR); a manual Lighthouse run for Web Vitals | Lighthouse CI (**deferred** with D7) |
 | **Manual API exploration** | **`Todo.Api.http`** + the Development-only API reference UI | Postman collections |
 | **Static checks** | .NET: compiler (nullable, warnings as errors), analysers, `dotnet format`. Web: `tsc --noEmit`, ESLint (with import-boundary rules), Prettier | StyleCop (overlaps) |
 | **Contract drift** | OpenAPI (build time) + `openapi-typescript` + `git diff --exit-code` (ADR-0009) | Hand-maintained types |
@@ -182,7 +238,7 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | Aspect | Decision |
 |---|---|
 | Location | Co-located `*.test.tsx` in each feature folder (ADR-0007 §3.11) |
-| Network | `vi.spyOn(globalThis, 'fetch')` in each test, with `jsonResponse` / `problemResponse` helpers from `test-setup.ts`. Assertions check both **the rendered outcome** and **the request made** (method, URL, `If-Match`, body) |
+| Network | `vi.stubGlobal("fetch", vi.fn())` in each test, with `jsonResponse` / `problemResponse` helpers from `test-setup.ts`. Assertions check both **the rendered outcome** and **the request made** (method, URL, `If-Match`, body) |
 | What is real | Components, TanStack Query hooks, the fetch wrapper, the form schemas |
 | What is never mocked | Hooks and API modules (no `vi.mock` for them) |
 | Queries | By role and label (Testing Library), which also enforces NFR-9 |
@@ -192,22 +248,23 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | Limit | Handling |
 |---|---|
 | Async Server Components can't be unit-tested with Vitest | Data views are client components (ADR-0002 guardrails); routes are thin (ADR-0007) |
-| Leaflet maps don't render meaningfully in jsdom | Replaced by a stub in component tests (the one justified module mock); covered by Playwright |
+| Leaflet maps don't render meaningfully in jsdom | Replaced by a stub in component tests (the one justified module mock); **checked manually** in the browser (D6) |
 | Docker is required for integration tests | `Todo.UnitTests` runs without Docker; Docker is on the demo checklist |
+| No test drives a real browser through the full stack | The D6 manual checklist + the post-deploy `curl` smoke checks |
 
 ### 3.6 Where the tools run in CI
 
 | Stage | Trigger | Tools | Budget |
 |---|---|---|---|
 | **Static** | Every PR / push | Compiler + analysers, `dotnet format`, `tsc`, ESLint, Prettier, tflint, `terraform validate`, `helm lint` + kubeconform, gitleaks, Trivy config, `oasdiff breaking` | < 1 min |
-| **Unit** | Every PR / push | xUnit (`Todo.UnitTests`, including ArchUnitNET), Vitest (components + `fetch` mocks + axe), size-limit | < 1 min |
-| **Integration** | Every PR / push | xUnit (`Todo.IntegrationTests`): one Testcontainers PostgreSQL per run + Respawn + real login + `FakeLogger`; EF pending-model check; OpenAPI and TS drift check | < 3 min (**monitor as the suite grows**, D2) |
-| **End-to-end** | PRs to `main` | Playwright + axe against Docker Compose | < 3 min |
-| **Post-deploy** | After `deploy.yml` | Smoke checks + the Playwright smoke journey (ADR-0010) | < 2 min |
-| **Nightly / on demand** | Schedule, manual | k6 (Q3, Q7), Lighthouse CI, coverage report | — |
+| **Unit** | Every PR / push | xUnit (`Todo.UnitTests`, including ArchUnitNET), Vitest (components + stubbed `fetch` + axe), size-limit | < 1 min |
+| **Integration** | Every PR / push | xUnit (`Todo.IntegrationTests`): one Testcontainers PostgreSQL per run + Respawn + real login + `FakeLogger`; the **Q3 query-plan test**; EF pending-model check; OpenAPI and TS drift check | < 3 min (**monitor as the suite grows**, D2) |
+| **Post-deploy** | After `deploy.yml` | Scripted `curl` smoke checks (ADR-0010) | < 1 min |
+| **Manual (release checklist)** | After deploys that change the UI or the flows | The D6 journeys; the D7 drills when the deployment or scaling set-up changes | ~10 min |
+| **Scheduled** | Schedule | Coverage report | — |
 | **Supply chain** | Image build; schedule | Trivy image, Dependabot, CodeQL | — |
 
-**Reporting:** TRX / JUnit results go to the job summary with PR annotations; Playwright traces are uploaded as artifacts on failure.
+**Reporting:** TRX / JUnit results go to the job summary with PR annotations.
 
 ### 3.7 Verification map: which tool proves which requirement
 
@@ -217,13 +274,16 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | Q6 concurrency (`xmin`) | xUnit + Testcontainers (only possible against real PostgreSQL, D2) |
 | Q2 transition matrix; BR-1 to BR-5 | xUnit `[Theory]` domain tests (no infrastructure, D1) |
 | Time-dependent behaviour (audit timestamps, token expiry) | `FakeClock` (D4) |
-| Q3 list p95 · Q4 zero-downtime deploys · Q7 scale-out | k6 scripts with thresholds |
+| Q3 list p95 | Query-plan integration test (deterministic) + observed p95 in telemetry (D7) |
+| Q4 zero-downtime deploys | Manual deployment drill: request loop during `helm upgrade` + a failing-release drill (D7) |
+| Q7 scale-out | HPA configuration review + manual scale drill; throughput measurement deferred (D7) |
+| Full-stack journeys; FR-10 / FR-11 maps | Manual release checklist (D6); `curl` smoke after deploy |
 | Q5 modifiability | A timed manual drill |
 | NFR-2 / NFR-3 validation and error contract | xUnit integration tests (ProblemDetails, `code`, no `traceId`); front-end `problemResponse` tests |
 | NFR-5 security baseline | gitleaks, Trivy, Dependabot, CodeQL / analysers, integration tests |
 | NFR-6 no secrets in logs; single `ILogger` call | `FakeLogger` + ArchUnitNET |
-| NFR-9 accessibility | vitest-axe + `@axe-core/playwright` |
-| ADR-0003 front-end budgets | size-limit + Lighthouse CI |
+| NFR-9 accessibility | vitest-axe + a manual keyboard check (D6) |
+| ADR-0003 front-end budgets | size-limit (CI) + a manual Lighthouse run (D7) |
 | ADR-0007 dependency rules | ArchUnitNET |
 | ADR-0009 contract consistency | OpenAPI + TS drift check |
 | NFR-4 / ADR-0010 infrastructure | tflint, `terraform validate` / `plan`, kubeconform, Trivy config |
@@ -252,7 +312,8 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | T4 | Real login vs a test authentication bypass | Security tests exercise the real pipeline | Slightly slower test set-up |
 | T5 | `IClock` vs `TimeProvider` | A one-member port that states exactly what's needed; a trivial fake | A custom interface instead of the first-party abstraction; framework components keep their own clocks |
 | T6 | `fetch` mocks vs MSW | No extra library for a small component set | Hand-rolled mocks may duplicate; MSW adopted at the trigger |
-| T7 | k6 nightly vs as a PR gate | Reliable results; fast PRs | Performance regressions found within a day, not per PR |
+| T7 | Manual full-stack journeys vs browser automation (D6) | No browser runtime, flakiness or suite maintenance for a small UI | Full-stack regressions are caught by a person, not by CI (R7) |
+| T8 | Deterministic checks + telemetry + drills vs load-test automation (D7) | No noisy thresholds on shared runners or a burstable cluster | Throughput and latency under load aren't measured automatically (R8) |
 
 ### 4.3 Risks
 
@@ -264,6 +325,8 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | R4 | Code reads `DateTimeOffset.UtcNow` directly, bypassing `IClock` | An ArchUnitNET or analyser rule banning direct `UtcNow` / `Now` calls outside `SystemClock` |
 | R5 | CodeQL isn't available for a private repository | Analysers + warnings as errors + ESLint as the static layer |
 | R6 | A tool changes licence | Permissive, first-party or widely adopted tools; Dependabot surfaces major versions for review |
+| R7 | **A full-stack regression** (routing, cookies, a UI flow) **is only found by hand,** or not at all | Post-deploy `curl` smoke checks; the manual release checklist; component and integration tests cover the logic; the D6 trigger |
+| R8 | **A performance regression goes unnoticed** until users feel it | The Q3 query-plan test catches the most likely cause (a lost index or an unbounded query); telemetry p95 for the list route; the defined latency alert (ADR-0008, V17); the D7 trigger |
 
 ### 4.4 Non-risks
 
@@ -272,7 +335,7 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | N1 | Tests passing while production queries fail | Real PostgreSQL; no in-memory provider; no mocked ORM |
 | N2 | Security tests that don't test security | The real login; no bypass |
 | N3 | Flaky time-dependent tests | `FakeClock`; no sleeps |
-| N4 | UI tests breaking on refactors | Testing Library by role and label; only `fetch` is mocked |
+| N4 | UI tests breaking on refactors | Testing Library by role and label; only `fetch` is stubbed |
 
 ---
 
@@ -282,6 +345,7 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 - **One small `IClock` / `SystemClock` pair,** and nothing more speculative. Add the `FakeClock` to the test projects.
 - **The integration test project needs a Testcontainers PostgreSQL fixture reused across the run,** not one per test, for speed. This is a real CI-time-budget decision, worth monitoring once the suite grows.
 - **No new front-end mocking library yet;** add MSW only when the D5 trigger is hit.
+- **No Playwright, k6 or Lighthouse CI in the repository or CI for now** (D6, D7). A manual release checklist (in `docs/runbook.md`) and the `curl` smoke checks cover full-stack verification. The Q3 query-plan test replaces the latency measurement.
 - **ADR-0005 §3.3 (time) and §3.4 (front-end MSW) are superseded,** and the related wording in ADR-0005, ADR-0006, ADR-0007 and ADR-0008 is updated.
 
 ### Impacts on other decision areas
@@ -292,7 +356,9 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | **Data (ADR-0006)** | The audit interceptor uses `IClock` |
 | **Component & structural (ADR-0007)** | `IClock` in `Application/Common/Interfaces`, `SystemClock` in `Infrastructure/Time`; `test-setup.ts` holds the `fetch` response helpers; ArchUnitNET rules, including the ban on direct `UtcNow` |
 | **Cross-cutting (ADR-0008)** | "Now" comes from `IClock`; `FakeLogger` for the logging tests |
-| **Deployment (ADR-0010)** | CI stages as §3.6; Docker on runners; the integration stage time is monitored |
+| **Deployment (ADR-0010)** | CI stages as §3.6 (no end-to-end or load stages); Docker on runners; the integration stage time is monitored; `curl` smoke only after deploy |
+| **Performance and scalability (ADR-0003, ADR-0004)** | Q3 verified by the query-plan test + telemetry; Q4 and Q7 by manual drills; load tests deferred |
+| **Evolution (ADR-0012)** | Browser automation and load-test automation added to the evolution register with their triggers |
 
 ---
 
@@ -305,11 +371,15 @@ Handlers could then be derived from the generated OpenAPI types (ADR-0009).
 | No direct wall-clock reads | Architecture or analyser rule (R4) |
 | No repository layer | Review: no `IRepository<T>`; `IAppDbContext` exposes `DbSet`s only |
 | Front-end tests don't mock hooks or API modules | Review / lint rule: `vi.mock` is used only for the map stub |
+| Q3 is protected without load tests | The query-plan integration test fails if the list query stops using the owner-first index |
+| Manual checks actually happen | The release checklist is ticked in the release notes for deploys that change the UI |
 | The PR pipeline stays within budget | CI timing; the integration stage in particular (D2) |
 
 ## 7. Revisit when
 
-- **The MSW trigger (D5) is hit:** duplicated endpoint mocks, contract drift in mocks, or network mocking needed in the browser or in Playwright.
+- **The MSW trigger (D5) is hit:** duplicated endpoint mocks, contract drift in mocks, or more complex request/response sequences than per-test stubs express well.
+- **The Playwright trigger (D6) is hit:** frequent manual checks, a full-stack regression escaping to production, or several people changing the UI.
+- **The k6 trigger (D7) is hit:** before real production traffic, a latency complaint, or a data-access or scaling change.
 - The integration stage exceeds its budget. Parallelise with a database per collection.
 - Code needs timers or delays, not just "now". Reconsider `TimeProvider` (D4 option c).
 - Several API consumers appear. Add contract tests (e.g. Pact).

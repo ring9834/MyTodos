@@ -115,7 +115,7 @@ The X-axis only works if **any request can go to any replica**. This checklist m
 | Minimum replicas | **2** (API and web) | Availability: survives one pod failure and supports rolling updates (Q4) |
 | Maximum replicas (API) | **Bounded by the database connection limit** (§3.6) and the quota | Unbounded scaling would exhaust database connections and turn a load spike into errors |
 | Scale-down | Stabilisation window (e.g. 5 minutes) | Avoids flapping between replica counts |
-| Resource requests and limits | Set from load-test measurements | HPA percentages are relative to requests, so wrong requests mean wrong scaling |
+| Resource requests and limits | Set from observed usage in telemetry; refined by load tests once introduced (ADR-0011 D7) | HPA percentages are relative to requests, so wrong requests mean wrong scaling |
 | Vertical Pod Autoscaler | ❌ | It conflicts with a CPU-based HPA on the same pods |
 | Event-driven autoscaling (e.g. KEDA) | ❌ | There are no queues or events to scale on (§3.4) |
 
@@ -251,10 +251,10 @@ Worked example, with **illustrative numbers** (check the actual limit of the cho
 
 | # | Risk | Mitigation |
 |---|---|---|
-| R1 | The single database primary is the scalability ceiling | The scaling path in §3.6; the bounded replica rule; measure the database under load test |
+| R1 | The single database primary is the scalability ceiling | The scaling path in §3.6; the bounded replica rule; watch database CPU and connections in telemetry |
 | R2 | The trial quota prevents demonstrating 3 API replicas plus a 2-replica web tier on one small node | Small resource requests; demonstrate Q7 at the largest replica count the quota allows, and document it |
-| R3 | CPU-based HPA reacts late or not at all when the API is waiting on the database | Load-test to see whether CPU tracks latency; plan custom metrics if not |
-| R4 | Burstable CPU credits (ADR-0003 R1) run out under sustained load: throttled pods show high CPU, the HPA adds replicas, but the real limit is credits or the database | Short load tests; watch CPU credits; fixed-performance tiers in production |
+| R3 | CPU-based HPA reacts late or not at all when the API is waiting on the database | Compare CPU with request latency in telemetry (load tests when ADR-0011 D7's trigger fires); plan custom metrics if CPU doesn't track latency |
+| R4 | Burstable CPU credits (ADR-0003 R1) run out under sustained load: throttled pods show high CPU, the HPA adds replicas, but the real limit is credits or the database | Watch CPU credits; fixed-performance tiers in production |
 | R5 | Scaling lag during a sudden spike | Headroom from minimum replicas and the 70% target; fast start-up; readiness probes |
 
 ### 4.4 Non-risks
@@ -283,12 +283,12 @@ Worked example, with **illustrative numbers** (check the actual limit of the cho
 
 | Decision area | Constraint or input from this decision |
 |---|---|
-| **Deployment & operations** | HPA on the API and web tiers (min 2, bounded max, CPU ~70%, scale-down stabilisation); resource requests set from load tests; migrations as a one-off job; graceful shutdown; readiness includes the database, liveness does not; capacity as Terraform and Helm values; cluster autoscaler in production |
+| **Deployment & operations** | HPA on the API and web tiers (min 2, bounded max, CPU ~70%, scale-down stabilisation); resource requests set from observed usage; migrations as a one-off job; graceful shutdown; readiness includes the database, liveness does not; capacity as Terraform and Helm values; cluster autoscaler in production |
 | **Data architecture** | A single primary; owner as the partition key on every table and first in every index (Z-axis readiness); pool size per replica; a retention policy noted for later |
 | **Communication & interaction** | REST over HTTP/JSON; every list paged with a maximum page size; no unbounded operations; idempotent PUT and DELETE |
-| **Component & structural** | A modular monolith with explicit modules (`Auth`, `Todos`); controllers vs minimal APIs decided there |
+| **Component & structural** | A modular monolith with explicit modules (`Auth`, `Todos`); controllers chosen there (ADR-0007 §3.7) |
 | **Cross-cutting concerns** | Nothing stored per instance; shared key material only through configuration; per-instance rate limiting recorded |
-| **Technology & tooling** | Kubernetes HPA; a load-test tool (e.g. k6, as in ADR-0003) |
+| **Technology & tooling** | Kubernetes HPA; load-test automation deferred (ADR-0011 D7) |
 | **Evolution & extensibility** | Triggers and paths for read replicas, partitioning, messaging with an outbox, GraphQL, real-time push with a backplane, and module extraction |
 
 ---
@@ -297,10 +297,10 @@ Worked example, with **illustrative numbers** (check the actual limit of the cho
 
 | Check | How | Driver |
 |---|---|---|
-| Throughput scales with replicas | Load test at 1 and 3 API replicas; compare throughput at the Q3 latency target | Q7 |
-| The HPA scales out and back in | Apply load; watch replicas rise to the bound and fall back after the stabilisation window | Q7 |
-| Statelessness | During the load test, requests carrying the same token succeed on every replica; delete a pod mid-test and confirm there are no failed requests | S1, Q4 |
-| Connection ceiling respected | At maximum replicas under load, the number of active database connections stays below the limit | S2 |
+| Scale-out works | **Manual scale drill:** `kubectl scale` the API to 3 replicas; confirm requests are served by every replica (telemetry). Throughput measurement deferred (ADR-0011 D7) | Q7 |
+| The HPA is configured correctly | Review `kubectl describe hpa`: min 2, max from the connection rule, CPU target; observe scale-in after the stabilisation window | Q7 |
+| Statelessness | While using the app (or a simple request loop), requests with the same token succeed on every replica; delete a pod and confirm there are no failed requests | S1, Q4 |
+| Connection ceiling respected | At maximum replicas, the number of active database connections stays below the limit | S2 |
 | Graceful shutdown | Scale down during load; confirm there are no failed requests | Q4 |
 
 ## 7. Revisit when

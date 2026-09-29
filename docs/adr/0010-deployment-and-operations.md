@@ -189,7 +189,7 @@ flowchart LR
 - `GET /api/auth/me` returns **401 problem+json**, which proves routing and the API are up.
 - The certificate is valid.
 
-A Playwright journey (ADR-0005) is the Should-level extension.
+Full user journeys (sign in → create → schedule → complete → delete → sign out) are **checked manually** from the release checklist; browser automation is deferred (ADR-0011 D6).
 
 ### 3.5 Images
 
@@ -214,7 +214,7 @@ A Playwright journey (ADR-0005) is the Should-level extension.
 
 | Template | Contents | Source |
 |---|---|---|
-| `Deployment` | Rolling update `maxUnavailable: 0`, `maxSurge: 1`; **startup, readiness and liveness probes** (`/health/ready`, `/health/live`); resource requests and limits from load tests; `securityContext` (non-root, read-only root filesystem, drop all capabilities, `RuntimeDefault` seccomp); `terminationGracePeriodSeconds` + a short `preStop` delay so the edge stops routing before shutdown | ADR-0001, ADR-0004 |
+| `Deployment` | Rolling update `maxUnavailable: 0`, `maxSurge: 1`; **startup, readiness and liveness probes** (`/health/ready`, `/health/live`); resource requests and limits from observed usage; `securityContext` (non-root, read-only root filesystem, drop all capabilities, `RuntimeDefault` seccomp); `terminationGracePeriodSeconds` + a short `preStop` delay so the edge stops routing before shutdown | ADR-0001, ADR-0004 |
 | `Service` | ClusterIP only | ADR-0001 |
 | `Ingress` | `/api` → this service; `ingressClassName` + `nginx.ingress.kubernetes.io` annotations (§3.2) | ADR-0009 |
 | `HorizontalPodAutoscaler` | Min 2, bounded max (ADR-0004 rule), CPU ~70% | ADR-0004 |
@@ -413,7 +413,7 @@ OpenAPI is used (ADR-0009). In the delivery pipeline:
 | Infrastructure has no drift | `terraform plan` after apply shows no changes | NFR-4 |
 | Rebuild from zero | Run bootstrap → infra → platform → deploy on a fresh subscription or resource group; record the time | NFR-4 |
 | A failing release rolls back | Deploy an image whose readiness fails → `--atomic` restores the previous revision; the app keeps serving | NFR-5, Q4 |
-| Zero failed requests during a rollout | Continuous traffic (k6) during `helm upgrade` | Q4 |
+| Zero failed requests during a rollout | **Manual drill:** a simple request loop (e.g. `curl` in a shell loop) during `helm upgrade`, counting non-2xx responses (load tooling deferred, ADR-0011 D7) | Q4 |
 | API-first ordering | The pipeline log shows the API release and smoke tests before the web release | ADR-0009 |
 | TLS | A valid certificate; HTTP redirects to HTTPS; HSTS present | NFR-10 |
 | No secrets in Helm history | `helm get values todo-api` shows no secret values | NFR-5 |

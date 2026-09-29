@@ -54,8 +54,8 @@ The whole stack in one place, with the ADR that chose each technology.
 | Azure (AKS) | Constrained choice (C-4) | [0002](0002-technology-stack.md) |
 | PostgreSQL (managed) | Open choice | [0002](0002-technology-stack.md) |
 | TanStack Query (server state); URL parameters for filters | Open choice | [0003](0003-performance.md) |
-| Load testing (e.g. k6); front-end budget checks (e.g. Lighthouse CI) | Open choice | [0003](0003-performance.md) |
-| xUnit v3, Shouldly, NSubstitute (rarely), `IClock` + `FakeClock`, `FakeLogger`, `WebApplicationFactory`, Testcontainers (one container per run), Respawn, ArchUnitNET; Vitest (jsdom), Testing Library, `fetch` spies (**MSW deferred**), vitest-axe, Playwright (+ axe); k6; Lighthouse CI; size-limit; gitleaks, Trivy, Dependabot, CodeQL, tflint, kubeconform | Open choice | [0011](0011-testability-strategy-and-testing-tooling.md) |
+| Bundle-size budget (size-limit); load testing (k6) and Lighthouse CI **deferred** | Open choice | [0003](0003-performance.md), [0011](0011-testability-strategy-and-testing-tooling.md) |
+| xUnit v3, Shouldly, NSubstitute (rarely), `IClock` + `FakeClock`, `FakeLogger`, `WebApplicationFactory`, Testcontainers (one container per run), Respawn, ArchUnitNET; Vitest (jsdom), Testing Library, stubbed `fetch` (`vi.stubGlobal`; **MSW deferred**), vitest-axe; **no browser automation or load-test automation for now** (Playwright, k6 deferred); size-limit; gitleaks, Trivy, Dependabot, CodeQL, tflint, kubeconform | Open choice | [0011](0011-testability-strategy-and-testing-tooling.md) |
 | `oasdiff` (OpenAPI breaking-change check); Asp.Versioning (when a v2 is needed); SemVer release tags + Conventional Commits | Open choice | [0012](0012-evolution-and-extensibility.md) |
 | Built-in .NET DI container | Open choice | [0005](0005-testability-and-maintainability.md) |
 | ASP.NET Core MVC controllers (`[ApiController]`) | Open choice | [0007](0007-component-and-structural.md) |

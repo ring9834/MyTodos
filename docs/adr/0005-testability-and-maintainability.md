@@ -53,7 +53,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 | **Dependency injection** | **The built-in .NET DI container**, constructor and parameter injection, with lifetimes validated at start-up | Third-party containers; service locator |
 | **Test seams** | **One narrow port for testability: `IClock`** (ADR-0011 D4). `ICurrentUser` exists for security and layering; options and typed `HttpClient` are framework mechanisms | Abstractions over the ORM, the framework or pure logic |
 | **Test doubles** | **Real collaborators first; hand-written fakes at seams; a mocking library only for external boundaries.** If one is needed: **NSubstitute** | Moq as the default (§3.4) |
-| **Test strategy** | **Integration-heavy:** unit tests for pure rules; API integration tests with a real database as the backbone; UI component tests with network-level mocking; a small end-to-end smoke test | Mock-heavy unit tests of wiring; a coverage-percentage target |
+| **Test strategy** | **Integration-heavy:** unit tests for pure rules; API integration tests with a real database as the backbone; UI component tests with a stubbed `fetch`; full-stack journeys checked manually (browser automation deferred, ADR-0011 D6) | Mock-heavy unit tests of wiring; a coverage-percentage target |
 | **API contract** | **OpenAPI as the single source of truth;** TypeScript types generated from it | Hand-maintained duplicate types |
 | **State model extensibility** | **A declarative transition table in one place; the API returns each item's allowed next states** (§3.6) | The State pattern; configurable (data-driven) statuses; a state-machine library |
 | **Code quality gates** | Nullable reference types; analysers; warnings as errors; formatters and linters; TypeScript `strict`; CI blocks merges on failures | — |
@@ -161,7 +161,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 | Moq | The most widely used historically. In 2023 one release bundled a dependency that collected hashed developer email addresses from git configuration during builds; it was removed after a backlash, but it's a relevant supply-chain lesson (ADR-0001 layer 8) | Acceptable if pinned to a reviewed version, but not preferred |
 | FakeItEasy | Similar capability | Not needed; one library only |
 
-**Front end:** the same philosophy applies. **Mock at the network boundary (the global `fetch`), not by mocking modules** (superseded here by ADR-0011 D5: `fetch` spies now, MSW deferred with a trigger). Components then run their real TanStack Query hooks and real fetch code against realistic HTTP responses, and tests survive refactoring.
+**Front end:** the same philosophy applies. **Mock at the network boundary (the global `fetch`), not by mocking modules** (superseded here by ADR-0011 D5: a stubbed `fetch` now, MSW deferred with a trigger). Components then run their real TanStack Query hooks and real fetch code against realistic HTTP responses, and tests survive refactoring.
 
 ### 3.5 Test strategy
 
@@ -172,8 +172,8 @@ The shape is the "testing trophy" rather than a strict pyramid: **integration te
 | **Static** | Types, nullability, analysers, linters | C# compiler (nullable, warnings as errors), analysers, TypeScript `strict`, ESLint | Whole classes of bugs never reach runtime |
 | **Unit** | Pure rules: the transition table, domain guard clauses, mapping, the exception-handler table | xUnit | Q2 (all from/to pairs), BR-1 to BR-5 |
 | **API integration** (the backbone) | The real HTTP pipeline + real auth + real PostgreSQL | xUnit, `WebApplicationFactory`, Testcontainers (PostgreSQL), a database reset between tests (e.g. Respawn) | Q1, Q6, Q8, Q3, NFR-2, NFR-3, the error format |
-| **UI component** | Components with real hooks against a mocked network | Vitest, Testing Library (queries by role and label), `fetch` spies (ADR-0011) | FR behaviour, validation messages, optimistic rollback, NFR-9 |
-| **End-to-end smoke** | One journey through the deployed system: sign in → create → schedule → complete | Playwright | The deployed wiring (Should) |
+| **UI component** | Components with real hooks against a mocked network | Vitest, Testing Library (queries by role and label), a stubbed `fetch` (ADR-0011) | FR behaviour, validation messages, optimistic rollback, NFR-9 |
+| **Full-stack journeys** | Sign in → create → schedule → complete → delete → sign out, through the deployed system | **A manual checklist** + `curl` smoke after deploy (Playwright deferred, ADR-0011 D6) | The deployed wiring |
 
 **Supporting rules:**
 - **Determinism:** no sleeps; time is controlled with `FakeClock`; each test creates its own data; the database is reset between tests.
@@ -311,7 +311,7 @@ public static class TodoTransitions
 | **Communication & interaction** | OpenAPI is the contract; each item's response includes `allowedTransitions`; a validation error format the UI can map onto form fields |
 | **Data architecture** | State stored as a string; whether to add a check constraint (integrity vs one migration line per new status); the ORM used directly |
 | **Cross-cutting concerns** | The validation approach (library or built-in); `IClock` everywhere instead of the static clock (ADR-0011); options for configuration |
-| **Technology & tooling** | **Finalised in ADR-0011:** xUnit v3, Shouldly, Testcontainers, Respawn, `FakeClock`, NSubstitute (sparingly), ArchUnitNET; Vitest, Testing Library, `fetch` spies (MSW deferred), Playwright; an OpenAPI → TypeScript generator; analysers and linters |
+| **Technology & tooling** | **Finalised in ADR-0011:** xUnit v3, Shouldly, Testcontainers, Respawn, `FakeClock`, NSubstitute (sparingly), ArchUnitNET; Vitest, Testing Library, a stubbed `fetch` (MSW deferred); Playwright and k6 deferred (ADR-0011 D6, D7); an OpenAPI → TypeScript generator; analysers and linters |
 | **Deployment & operations** | CI gates: build with warnings as errors, all tests, generated-types check, lint; Docker available on the CI runners |
 | **Evolution & extensibility** | A trigger for data-driven workflows (§3.6 D) and for a state-machine library (§3.6 E) |
 

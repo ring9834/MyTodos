@@ -68,7 +68,7 @@ Q3 is the only performance requirement given. The other budgets below are **deri
 | **Read/write separation (CQRS)** | **No CQRS.** One data model and one database for reads and writes. Only a *light* separation in code: reads project straight to response models, and writes go through the entity and its state rules (§3.7) | Separate read models, read stores or databases; event sourcing; asynchronous projections |
 | **Data access** | Indexes that start with the owner; server-side paging (offset, bounded page size, stable sort); projection to response models; read-only queries without change tracking; bounded timeouts; connection pooling sized to the database's limits | Keyset (cursor) paging, read replicas, materialised views, an ORM-level second-level cache |
 | **Cloud** | API and database in the **same region (and zone where possible)**; right-sized tiers; the edge routes `/api/*` **directly** to the API | Multi-region; a CDN in front of the API |
-| **Measurement** | Automated latency test for Q3; a load-test tool for Q7; front-end budget checks; per-request duration from the ASP.NET Core instrumentation metric (`http.server.request.duration`, ADR-0008) | Full tracing and APM (deferred with the observability stack) |
+| **Measurement** | A **deterministic query-plan test** for Q3 (ADR-0011 D7); p95 observed from the ASP.NET Core instrumentation metric (`http.server.request.duration`, ADR-0008); the bundle-size budget in CI. **Load testing and Lighthouse CI deferred** (ADR-0011 D7) | Full tracing and APM (deferred with the observability stack) |
 
 ---
 
@@ -167,7 +167,7 @@ The mechanism (version column, status code) is decided in the Data Integrity ADR
 | Microservices | ❌ | Each extra hop adds latency and a failure point, and distributed data needs coordination. No part of the domain has different scaling needs. (Structural reasons are recorded in the Component & Structural ADR) |
 | CQRS / separate read models | ❌ | See §3.7 |
 | Native ahead-of-time compilation | ❌ | Its main benefit is start-up time, which doesn't matter for long-running pods, and the ORM's support for it is limited |
-| **Dedicated state-change operation** (e.g. `PATCH …/state`) | ✅ (input to Communication & Interaction) | A tiny payload for the most frequent action, and a clear place to enforce the transition rules (Q2) |
+| **Dedicated state-change operation** (realised as `PUT /api/todos/{id}/state`, ADR-0009 §3.3) | ✅ (input to Communication & Interaction) | A tiny payload for the most frequent action, and a clear place to enforce the transition rules (Q2) |
 | **Compression of text responses** | ✅ at the edge | Smaller transfers for JSON and static assets. BREACH-style attacks are a non-risk because response bodies carry no secrets (tokens travel in cookies) |
 
 ### 3.7 Read/write separation (CQRS)
@@ -222,7 +222,7 @@ Even then, the next step would be level 2 or 3, not level 4.
 | **Co-locate the API and the database** in the same region, and the same availability zone where possible | ✅ | The database round trip happens on every request, and cross-zone or cross-region latency adds directly to Q3 |
 | **Region close to the users** | ✅ | Every browser round trip crosses this distance |
 | **The edge routes `/api/*` directly to the API**, not through Next.js rewrites | ✅ (input to Communication & Interaction) | Avoids an extra network hop and keeps load off the Node.js server; the same-origin requirement (ADR-0001 S4) is still met |
-| **Burstable VM and database tiers** (trial budget) | ⚠️ Accepted, with a caveat | Cheap, but sustained load uses up CPU credits and then throttles, which can blow the p95 budget during load tests. See R1 |
+| **Burstable VM and database tiers** (trial budget) | ⚠️ Accepted, with a caveat | Cheap, but sustained load uses up CPU credits and then throttles, which can blow the p95 budget under sustained load. See R1 |
 | Multi-region, geo-distributed database | ❌ | No requirement; a large cost and complexity increase |
 | Autoscaling | ✅ (mechanism in the Scalability ADR) | Performance supplies the signal: scale on CPU, and on latency if it's available |
 
@@ -258,7 +258,7 @@ Even then, the next step would be level 2 or 3, not level 4.
 
 | # | Risk | Mitigation |
 |---|---|---|
-| R1 | Burstable tiers throttle during sustained load tests, and the p95 budgets are missed in the cloud | Short load tests; monitor CPU credits; document the result; a fixed-performance tier for production |
+| R1 | Burstable tiers throttle under sustained load, and the p95 budgets are missed in the cloud | Monitor CPU credits and the list-route p95 in telemetry; document the result; a fixed-performance tier for production; load tests when ADR-0011 D7's trigger fires |
 | R2 | Q3 is specified "locally", so meeting it locally says little about the cloud | Also measure in the cloud and record both figures; the difference is the network and tier cost |
 | R3 | The database becomes the bottleneck for Q7, because it scales up, not out | Right-size the tier; pool sizing rule (S2); built-in connection pooler; read replicas as a later step |
 | R4 | Routing `/api/*` through Next.js by accident (e.g. via rewrites) adds a hop and loads the Node.js server | Record edge routing explicitly in the Communication & Interaction ADR; check it in the walking skeleton |
@@ -295,9 +295,9 @@ Even then, the next step would be level 2 or 3, not level 4.
 | **Data architecture** | Owner-first indexes for every list query; stable sort columns; optimistic concurrency (mechanism to choose); command timeouts |
 | **Communication & interaction** | Server-side paging parameters (page, page size ≤ 100) and total count; a dedicated state-change operation; mutations return the updated item; `Cache-Control: no-store` on API responses; the edge routes `/api/*` directly to the API |
 | **Component & structural** | One API service; command/query separation in code (CQRS level 1, §3.7), realised as `Commands/` and `Queries/` folders in `Todo.Application` (ADR-0007); client components for data; filter state in the URL; the map as a separately loaded component |
-| **Deployment & operations** | API and database co-located; connection pool sizing rule; compression and static-asset caching at the edge; resource requests sized from load-test results |
+| **Deployment & operations** | API and database co-located; connection pool sizing rule; compression and static-asset caching at the edge; resource requests sized from observed usage (load tests deferred, ADR-0011 D7) |
 | **Scalability (quality attribute)** | Stateless, async API; the database as the scaling limit; pool sizing interacts with replica count |
-| **Technology & tooling** | TanStack Query; a load-test tool (e.g. k6); a front-end budget check (e.g. Lighthouse CI) |
+| **Technology & tooling** | TanStack Query; size-limit for the bundle budget; load testing (k6) and Lighthouse CI deferred (ADR-0011 D7) |
 | **Cross-cutting concerns** | Per-request duration from automatic instrumentation (spans and metrics), not log lines (ADR-0008 §3.1) |
 | **Evolution & extensibility** | Triggers for a distributed cache, a CDN, keyset paging, background workers and read replicas |
 
@@ -307,10 +307,10 @@ Even then, the next step would be level 2 or 3, not level 4.
 
 | Check | How | Budget |
 |---|---|---|
-| Q3: list latency | Automated test: seed 1,000+ items for one user; call the list endpoint repeatedly with filters and paging; assert p95 | < 200 ms |
+| Q3: list latency | **Deterministic integration test:** seed 1,000+ items for one user; assert the list query's plan uses the owner-first index and results are bounded by the page size. **Observed p95** of the list route in telemetry during manual use (ADR-0011 D7) | < 200 ms (observed) |
 | Database query plan | Review the query plan for the list query; confirm it uses the owner-first index | < 50 ms |
-| Q7: throughput scaling | Load test at 1 and 3 API instances | Near-linear scaling; Q3 still met |
-| Front-end budgets | Lighthouse (or equivalent) against the list page; bundle-size check in CI | LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1; initial JS ≤ 250 KB gzipped |
+| Q7: throughput scaling | HPA configuration review + a manual scale drill; throughput measurement deferred (ADR-0011 D7) | Near-linear scaling (to be measured when load tests are introduced) |
+| Front-end budgets | size-limit in CI; a manual Lighthouse run against the list page (Lighthouse CI deferred, ADR-0011 D7) | LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1; initial JS ≤ 250 KB gzipped |
 | Caching headers | Integration test: API responses carry `no-store`; hashed static assets carry `immutable` | — |
 | Optimistic rollback | UI test: a failed state change (including a conflict) restores the previous state and shows a message | — |
 
