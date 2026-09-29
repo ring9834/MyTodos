@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed. **§3.2 (code organisation) superseded by ADR-0007**, which adopts Clean Architecture projects while keeping this ADR's rejections of MediatR, AutoMapper and repositories |
+| **Status** | Proposed. **§3.2 (code organisation) superseded by ADR-0007**, which adopts Clean Architecture projects while keeping this ADR's rejections of MediatR, AutoMapper and repositories. **§3.3's time seam and §3.4's front-end MSW are superseded by ADR-0011** |
 | **Date** | 2026-09-29 |
 | **Decision area** | Quality Attributes → **Testability** and **Maintainability / modifiability** |
 | **Method** | Attribute-Driven Design, using the SEI modifiability tactics (increase cohesion, reduce coupling, defer binding) and testability tactics (control and observe state, limit complexity); analysed with ATAM concepts |
@@ -51,7 +51,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 | **Data access** | **Use the ORM's context directly** (through `IAppDbContext` in Application, ADR-0007 §3.4) | A repository or unit-of-work wrapper over the ORM |
 | **Mediators and mappers** | **Direct handlers and hand-written mapping** | MediatR, AutoMapper |
 | **Dependency injection** | **The built-in .NET DI container**, constructor and parameter injection, with lifetimes validated at start-up | Third-party containers; service locator |
-| **Test seams** | **Only four:** time (`TimeProvider`), current user, configuration (options), outbound HTTP (handler) | Abstractions over the ORM, the framework or pure logic |
+| **Test seams** | **One narrow port for testability: `IClock`** (ADR-0011 D4). `ICurrentUser` exists for security and layering; options and typed `HttpClient` are framework mechanisms | Abstractions over the ORM, the framework or pure logic |
 | **Test doubles** | **Real collaborators first; hand-written fakes at seams; a mocking library only for external boundaries.** If one is needed: **NSubstitute** | Moq as the default (§3.4) |
 | **Test strategy** | **Integration-heavy:** unit tests for pure rules; API integration tests with a real database as the backbone; UI component tests with network-level mocking; a small end-to-end smoke test | Mock-heavy unit tests of wiring; a coverage-percentage target |
 | **API contract** | **OpenAPI as the single source of truth;** TypeScript types generated from it | Hand-maintained duplicate types |
@@ -106,7 +106,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 
 **Rules:**
 - Constructor injection in classes; action-level `[FromServices]` injection of use-case handlers in controllers (ADR-0007 §3.7).
-- **Lifetimes:** the ORM context is *scoped* (one per request); `TimeProvider` is a *singleton*; the current-user service is *scoped* (it reads the request's identity).
+- **Lifetimes:** the ORM context is *scoped* (one per request); `IClock` (`SystemClock`) is a *singleton*; the current-user service is *scoped* (it reads the request's identity).
 - **Validate on start-up:** scope and build validation are enabled in development and tests, so a lifetime mistake (such as a singleton capturing a scoped context) fails immediately instead of at runtime.
 - Registrations are grouped per module (`AddTodos()`, `AddAuth()`) so each module's wiring is visible in one place.
 
@@ -114,7 +114,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 
 | Seam | Abstraction | Why it varies or is outside our control | Test replacement |
 |---|---|---|---|
-| Time | `TimeProvider` (built into .NET) | The real clock makes tests non-deterministic (token expiry, `createdAt`) | `FakeTimeProvider` |
+| Time | `IClock` (one member, `UtcNow`; **superseded here by ADR-0011 D4**, was `TimeProvider`) | The real clock makes tests non-deterministic (token expiry, `createdAt`) | `FakeClock` |
 | Current user | `ICurrentUser` | It comes from the request's token; ADR-0001's owner filter depends on it | The real one in integration tests (real tokens); a simple fake in unit tests |
 | Configuration | Options pattern (`IOptions<T>`) | Varies by environment | Test configuration values |
 | Outbound HTTP (future: geocoding) | Typed `HttpClient` | An external service we don't control | A stub `HttpMessageHandler`, or an HTTP simulator |
@@ -126,7 +126,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 **The order of preference for any collaborator:**
 
 1. **The real thing**, if it's fast and deterministic: pure domain rules, validators, mapping, and the real database via Testcontainers.
-2. **A hand-written fake** at a seam, e.g. `FakeTimeProvider` or a `FakeCurrentUser` class. It is simple, readable and reusable, with no library to learn.
+2. **A hand-written fake** at a seam, e.g. `FakeClock` or a `FakeCurrentUser` class. It is simple, readable and reusable, with no library to learn.
 3. **A mocking library**, only for external boundaries or for injecting failures (exceptions, timeouts) that are hard to produce for real.
 
 **Where a mocking library cannot be used effectively:**
@@ -161,7 +161,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 | Moq | The most widely used historically. In 2023 one release bundled a dependency that collected hashed developer email addresses from git configuration during builds; it was removed after a backlash, but it's a relevant supply-chain lesson (ADR-0001 layer 8) | Acceptable if pinned to a reviewed version, but not preferred |
 | FakeItEasy | Similar capability | Not needed; one library only |
 
-**Front end:** the same philosophy applies. **Mock at the network level with MSW** (Mock Service Worker), not by mocking modules. Components then run their real TanStack Query hooks and real fetch code against realistic HTTP responses, and tests survive refactoring.
+**Front end:** the same philosophy applies. **Mock at the network boundary (the global `fetch`), not by mocking modules** (superseded here by ADR-0011 D5: `fetch` spies now, MSW deferred with a trigger). Components then run their real TanStack Query hooks and real fetch code against realistic HTTP responses, and tests survive refactoring.
 
 ### 3.5 Test strategy
 
@@ -172,11 +172,11 @@ The shape is the "testing trophy" rather than a strict pyramid: **integration te
 | **Static** | Types, nullability, analysers, linters | C# compiler (nullable, warnings as errors), analysers, TypeScript `strict`, ESLint | Whole classes of bugs never reach runtime |
 | **Unit** | Pure rules: the transition table, domain guard clauses, mapping, the exception-handler table | xUnit | Q2 (all from/to pairs), BR-1 to BR-5 |
 | **API integration** (the backbone) | The real HTTP pipeline + real auth + real PostgreSQL | xUnit, `WebApplicationFactory`, Testcontainers (PostgreSQL), a database reset between tests (e.g. Respawn) | Q1, Q6, Q8, Q3, NFR-2, NFR-3, the error format |
-| **UI component** | Components with real hooks against a mocked network | Vitest, Testing Library (queries by role and label), MSW | FR behaviour, validation messages, optimistic rollback, NFR-9 |
+| **UI component** | Components with real hooks against a mocked network | Vitest, Testing Library (queries by role and label), `fetch` spies (ADR-0011) | FR behaviour, validation messages, optimistic rollback, NFR-9 |
 | **End-to-end smoke** | One journey through the deployed system: sign in → create → schedule → complete | Playwright | The deployed wiring (Should) |
 
 **Supporting rules:**
-- **Determinism:** no sleeps; time is controlled with `FakeTimeProvider`; each test creates its own data; the database is reset between tests.
+- **Determinism:** no sleeps; time is controlled with `FakeClock`; each test creates its own data; the database is reset between tests.
 - **Test data builders** (e.g. `ATodo().Scheduled(on: date).OwnedBy(alice)`) keep tests short and make adding a field a change in one place.
 - **Naming:** `Method_Scenario_ExpectedOutcome` or a readable sentence, so a failing test explains itself.
 - **No coverage-percentage target.** Coverage is reviewed for *gaps in rules* (every BR and Q has a test; see the traceability matrix), not chased as a number.
@@ -310,8 +310,8 @@ public static class TodoTransitions
 | **Component & structural** | Decided in ADR-0007: Clean Architecture projects with feature folders per layer; a pure domain core; no repository, mediator or mapper layers; controllers (`[ApiController]`) |
 | **Communication & interaction** | OpenAPI is the contract; each item's response includes `allowedTransitions`; a validation error format the UI can map onto form fields |
 | **Data architecture** | State stored as a string; whether to add a check constraint (integrity vs one migration line per new status); the ORM used directly |
-| **Cross-cutting concerns** | The validation approach (library or built-in); `TimeProvider` everywhere instead of the static clock; options for configuration |
-| **Technology & tooling** | xUnit, Testcontainers, a database-reset tool, `FakeTimeProvider`, NSubstitute (sparingly), Vitest, Testing Library, MSW, Playwright, an OpenAPI → TypeScript generator, analysers and linters |
+| **Cross-cutting concerns** | The validation approach (library or built-in); `IClock` everywhere instead of the static clock (ADR-0011); options for configuration |
+| **Technology & tooling** | **Finalised in ADR-0011:** xUnit v3, Shouldly, Testcontainers, Respawn, `FakeClock`, NSubstitute (sparingly), ArchUnitNET; Vitest, Testing Library, `fetch` spies (MSW deferred), Playwright; an OpenAPI → TypeScript generator; analysers and linters |
 | **Deployment & operations** | CI gates: build with warnings as errors, all tests, generated-types check, lint; Docker available on the CI runners |
 | **Evolution & extensibility** | A trigger for data-driven workflows (§3.6 D) and for a state-machine library (§3.6 E) |
 

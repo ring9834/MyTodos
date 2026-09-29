@@ -221,7 +221,7 @@ These are decisions that help one attribute at the cost of another.
 
 | # | Risk | Mitigation now | Resolution later |
 |---|---|---|---|
-| R1 | A stolen token stays valid until it expires (up to 8 hours); logout only clears the browser's copy | `HttpOnly` cookie; TLS; emergency revocation by rotating the signing key (signs everyone out) | A short access token plus refresh via a BFF, or IdP-managed sessions |
+| R1 | A stolen token stays valid until it expires (up to 8 hours); logout only clears the browser's copy | `HttpOnly` cookie; TLS; emergency revocation by rotating the signing key (signs everyone out); planned rotation without sign-out uses `kid` + current/previous keys (ADR-0012 §3.4) | A short access token plus refresh via a BFF, or IdP-managed sessions |
 | R2 | We own password handling: no MFA, lockout or reset | Only pre-seeded test users; strong hashing; rate limiting | External IdP (section 6) |
 | R3 | Traffic inside the cluster is unencrypted | Network policies limit who can talk to whom | mTLS (e.g. a service mesh), if warranted |
 | R4 | Platform-native secrets may only be encoded, not encrypted, depending on the platform setup | Access limited by RBAC; never committed to git | A managed secrets vault, accessed with workload identity |
@@ -258,7 +258,6 @@ This ADR decides tactics. The areas below choose the mechanisms, and must honour
 
 | Decision area | Constraint or input from this decision | Key refs |
 |---|---|---|
-| **Inside vs. outside the system** | Trust boundaries TB1–TB4; external actors: gardener, operator, CI/CD pipeline, a future IdP. The edge is the only outside-facing element | §1.3 |
 | **Data architecture** | A `User` concept with a password hash (never readable); every item has an owner set from the token; a central owner filter on every query; tokens carry no personal data beyond the username; data-store connections use TLS; separate migration and runtime users later (R6) | §4.4, S3, R6 |
 | **Deployment & operations** | TLS at the edge (NFR-10 now Must); no public entry to the API or data store; network-policy enforcement enabled on the cluster; the pipeline supplies three secrets (signing key, data-store password, seed passwords); a documented signing-key rotation procedure for emergency revocation | §4.5, S1, S5, R1 |
 | **Component & structural** | An auth component in the API (login, logout, me); one current-user abstraction used by the data layer's owner filter; the UI's route guard is for UX only | §4.1, §4.4 |

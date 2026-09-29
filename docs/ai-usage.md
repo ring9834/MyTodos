@@ -89,7 +89,7 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
 ### Phase 1: Architecture and design
 
 **Decision map and ADR-0001 (Quality Attributes → Security)**
-- **Asked AI to:** organise Phase 1 around my nine decision areas, and make the first decision: Quality Attributes → Security.
+- **Asked AI to:** organise Phase 1 around my decision areas, and make the first decision: Quality Attributes → Security.
 - **Accepted:** the tactics (app-managed credentials; JWT carried in an `HttpOnly` cookie; deny by default; a central owner filter; eight defence layers), the ATAM analysis, and the NFR-10 (HTTPS) promotion.
 - **Problem I spotted:** the ADR described Next.js, .NET, PostgreSQL, Azure/AKS and GitHub Actions as a "baseline fixed by the constraints". The brief fixes none of them: it says only "React (and any supporting libraries)", an allowed backend language, AWS or Azure, and Kubernetes. It also cited requirements A5 for Next.js, but A5 doesn't say that.
 - **Outcome:** ADR-0001 was rewritten to be technology-neutral (tactics only), with a table separating what is fixed from what is open. Stack-specific mechanisms moved to a conditional appendix. The stack references in ADR-0002 and the ADR index were corrected.
@@ -179,9 +179,51 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
   - _[✓ confirm the add-on's current support window]_
 - **To verify myself before the interview:** _[✓]_ run the full pipeline end to end (R7); _[✓]_ a deliberately failing release rolls back; _[✓]_ start the cluster and database well ahead (R6).
 
-**ADR-0011 (Technology & tooling → testing and quality)**
-- **Asked AI to:** select unit, integration, CI-integrated and front-end testing tools.
-- **Accepted:** xUnit v3 + Shouldly; Testcontainers + Respawn + `WebApplicationFactory` with real tokens; first-party `FakeTimeProvider` and `FakeLogger`; ArchUnitNET; Vitest + Testing Library + MSW + axe; Playwright; k6 (nightly, not a PR gate); size-limit + Lighthouse CI; gitleaks, Trivy (images and IaC), Dependabot, CodeQL where available.
-- **Selection principle I adopted:** licence and supply chain as an explicit criterion. FluentAssertions was rejected because of its commercial licence from v8.
-- **To check myself:** _[✓]_ the licence claims (FluentAssertions v8; CodeQL availability for my repository's plan); _[✓]_ the PR pipeline stays within about 5 minutes.
+**ADR-0011 (Testability strategy and testing tooling)**
+- **First draft (AI):** a tool selection that included `FakeTimeProvider` and MSW.
+- **Regenerated from my own ADR draft:**
+  1. no generic repository layer
+  2. Testcontainers over in-memory, SQLite or a shared database, because Q6's `xmin` can't be tested honestly against SQLite
+  3. the real login in tests, with no auth bypass
+  4. **one narrow `IClock` port** instead of `TimeProvider`
+  5. **`fetch` mocks now, MSW deferred with a trigger**
+
+  My right-sizing test: *does the abstraction solve a problem that exists here, or add indirection for its own sake?*
+- **Reconciled by AI:**
+  - my numbering (Q8–Q11, ADR-0003/0004/0007…) was mapped to this repository's requirements and ADRs
+  - `IAppDbContext` (ADR-0007) is kept as a non-repository interface, to preserve the dependency rule
+  - ADR-0005's time seam and front-end MSW were marked superseded, and ADR-0006, ADR-0007 and ADR-0008 updated
+  - a rule banning direct `UtcNow` calls was added (R4)
+- **To check myself:** _[✓]_ the licence claims (FluentAssertions v8; CodeQL availability for my plan); _[✓]_ the integration stage time with one shared container.
+
+**ADR-0012 (Evolution & extensibility)**
+- **Asked AI to:** decide versioning of APIs and data, and other evolution concerns for this project.
+- **Accepted:**
+  - one compatibility rule, N / N−1, for the API, schema, tokens and configuration
+  - `oasdiff breaking` in CI, which enforces "additive only"
+  - URL-segment versioning with Asp.Versioning when a break is unavoidable
+  - a deprecation policy (`Deprecation` / `Sunset` headers; removal at zero traffic)
+  - forward-only migrations with large backfills as separate Jobs
+  - `kid`-based key rotation without signing users out
+  - chunk-load reload for client version skew
+  - SHA images + SemVer release tags
+  - a quarterly platform lifecycle calendar
+  - nine named extension points, and an explicit list of speculative extensibility **not** built
+  - a 20-item evolution register with observable triggers
+- **To check myself:** _[✓]_ the RFC numbers for the `Deprecation` (RFC 9745) and `Sunset` (RFC 8594) headers; _[fill in: which register items I'd mention if asked "what would you do next?"]_
+
+**architecture.md (Phase 1 wrap-up)**
+- **Asked AI to:** generate `architecture.md` once all decisions were made.
+- **Contents:**
+  - the system at a glance
+  - drivers and the utility tree
+  - eight design principles distilled from the ADRs
+  - container, component, deployment, data and runtime views
+  - a quality-attribute → tactic → mechanism → test table
+  - a one-line summary per ADR
+  - consolidated ATAM analysis, grouping the individual risks into seven risk themes
+  - open items
+  - requirements → design traceability
+- **Rule stated in the document:** if it disagrees with an ADR, the ADR wins.
+- **To do myself:** _[✓]_ check every diagram against the code as it's built; _[✓]_ resolve open items O1–O10 (§9).
 - **Deliberate deviation to be ready to explain:** a stale `If-Match` returns **409**, not HTTP's 412, so all conflicts share one status and path through `TodoExceptionHandler` (T3). _[decide: keep 409, or switch to 412]_ _[decide: keep the broad types, or throw domain subclasses such as `TodoNotFoundException : KeyNotFoundException`]_
