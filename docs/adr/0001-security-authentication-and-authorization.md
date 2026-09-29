@@ -183,7 +183,7 @@ Every layer assumes the ones outside it might fail.
 | 6 | **Authorization and data** | Deny by default; the owner filter on every query; server-side validation; parameterised queries only (no string-built SQL) | ✅ |
 | 7 | **Secrets and runtime** | The signing key, data-store password and seed passwords come from the platform's secret store, populated by the pipeline, never from git or images. Containers run as non-root, with a read-only root filesystem, dropped capabilities and resource limits | ✅. A managed secrets vault is deferred |
 | 8 | **Supply chain and delivery** | The pipeline authenticates to the cloud via **workload identity federation** (OIDC; no stored cloud secret); dependency vulnerability checks; pinned base images; image scanning; secret scanning | ✅ except image scanning (Should) |
-| — | **Detection** | Structured logs of sign-in successes and failures (username, IP, outcome), never passwords or tokens (NFR-6) | ✅ |
+| — | **Detection** | Sign-in outcomes observed through automatic request instrumentation: rates of 200 / 401 / 429 on the sign-in route, with an alert on spikes. No per-user sign-in log lines (application code doesn't log; ADR-0008 §3.1). Passwords and tokens never appear in telemetry (NFR-6) | ✅ (per-user audit log deferred; ADR-0008 R10) |
 
 ---
 
@@ -298,7 +298,7 @@ This ADR decides tactics. The areas below choose the mechanisms, and must honour
 | The response cookie has `HttpOnly`, `Secure` and `SameSite=Strict` set | API integration test | T3 |
 | Health endpoints respond without authentication | API integration test | S7 |
 | No secrets in the repository | Pipeline secret scan and review | NFR-5 |
-| Logs contain no passwords or tokens | Review of the running logs | NFR-6 |
+| Logs and telemetry contain no passwords or tokens | Log-capture test (ADR-0008 §6); review of exported telemetry | NFR-6 |
 
 ## 10. Revisit when
 
@@ -310,7 +310,7 @@ This ADR decides tactics. The areas below choose the mechanisms, and must honour
 
 ## Appendix A: Illustrative realisation (conditional)
 
-> **Not part of the decision.** This shows that the tactics can be realised with the *candidate* stack in ADR-0002 (still Proposed). The authoritative mechanism choices are made in the relevant ADRs, and this appendix is updated or removed when they are accepted.
+> **Not part of the decision.** This shows that the tactics can be realised with the stack selected in ADR-0002 (.NET backend; Next.js frontend). The authoritative mechanism choices are made in the relevant ADRs, and this appendix is updated or removed when they are accepted.
 
 | Tactic | Candidate mechanism (.NET API) | Alternative if another allowed backend is chosen |
 |---|---|---|

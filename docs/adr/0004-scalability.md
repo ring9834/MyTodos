@@ -88,7 +88,7 @@ The X-axis only works if **any request can go to any replica**. This checklist m
 | User session | JWT in a cookie; validated by any replica with the shared signing key (ADR-0001) | ✅ |
 | Server-side caches | None (ADR-0003) | ✅ |
 | Files | None written; read-only root filesystem (ADR-0001 layer 7) | ✅ |
-| Logs | Written to stdout and collected by the platform | ✅ |
+| Logs and telemetry | Exported through OpenTelemetry, with stdout as the fallback; nothing stored locally (ADR-0008) | ✅ |
 | Configuration and secrets | Environment variables and platform secrets; identical across replicas | ✅ |
 | Rate-limiter counters | Held **per instance** | ⚠️ Effective limit = N × configured limit (S5) |
 | Database migrations | Must run **once per release**, not in every replica at start-up | ✅ if run as a separate job (Deployment ADR) |

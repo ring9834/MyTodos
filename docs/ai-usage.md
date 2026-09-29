@@ -134,3 +134,54 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
 - **My decision:** Clean Architecture with four projects (`Todo.Api`, `Todo.Application`, `Todo.Domain`, `Todo.Infrastructure`), which is what my repository already had, plus feature folders under `web/src/components/`. _[fill in your reasons in your own words, e.g. a compiler-enforced dependency rule, familiarity to reviewers]_
 - **How the conflict was handled:** ADR-0007 was revised with a change log, and ADR-0005 §3.2 was marked superseded rather than left contradicting it. ADR-0005's guardrails (no MediatR, AutoMapper or repository) were kept to limit ceremony, and the Q5 change-cost target was updated honestly (about 14 files instead of about 8).
 - **Verified by:** _[✓ when done]_ the timed add-a-field drill following ADR-0007 §3.10.
+
+**ADR-0008 (Cross-cutting concerns)**
+- **Asked AI to:** decide on observability (logging, metrics, tracing, alerting), error handling and exception strategy, configuration and feature flags.
+- **Accepted:** built-in logging with JSON output and strict content rules; OpenTelemetry instrumented now with export off by default (respecting the requirements' deferral of advanced monitoring); RFC 9457 ProblemDetails with a stable `code`; outcomes vs exceptions; FluentValidation through one endpoint filter; fail-fast options validation; no feature flags yet.
+- **Checked:** the derived SLOs (99.5%, <1% errors) are marked as design choices, not requirements. _[fill in: agree?]_
+- **Verified by:** _[✓ when done]_ the log-capture test (no secrets or addresses in logs) and the no-stack-trace test in ADR-0008 §6.
+- **Changed by me:** replaced the AI's outcome types and FluentValidation filter with **ASP.NET Core's built-in ProblemDetails** (`AddProblemDetails()`, RFC 9457) and **one `IExceptionHandler` (`TodoExceptionHandler`)** mapping `KeyNotFoundException` → 404, `InvalidTodoTransitionException` → 409, `DbUpdateConcurrencyException` → 409, `ArgumentException` → 400, and anything else → 500. This uses the framework's mechanism instead of custom error middleware, and validation lives in domain guard clauses (one source of rules).
+- **Trade-off I accepted, with safeguards:** mapping broad framework exception types can misclassify bugs (ADR-0008 R6).
+- **Changed by me:** no `traceId` in error responses, because OpenTelemetry already correlates logs, traces and metrics. The framework adds `traceId` by default, so it's removed in `CustomizeProblemDetails`, and a test guards it. Accepted cost: a user's error report can't be matched directly to its trace (ADR-0008 R8).
+- **Changed by me:** no `ILogger` in application code. Automatic instrumentation earns its keep at instrumented library boundaries, and a single, centralised `ILogger` call at the one true chokepoint (`TodoExceptionHandler`) covers what instrumentation structurally can't reach: application-level exceptions with no span of their own.
+- **Consequences worked through with AI:**
+  - Telemetry export must now be on wherever the system runs (it's required configuration in Production and validated at start-up), because spans and metrics are the only signal for normal traffic.
+  - HTTP request logging was removed.
+  - ADR-0001's detection layer moved from per-user sign-in logs to sign-in-route metrics.
+  - An architecture test enforces the single-`ILogger` rule.
+  - New risks were recorded: R9 (blind if export is off) and R10 (weaker sign-in detection).
+- **Changed by me (ADR-0007):** a controller-based RESTful API (`[ApiController]` controllers, one per resource) instead of minimal APIs. My reasoning: _[fill in: e.g. familiar conventions, class-level routing and authorization]_. Worked through with AI:
+  - With Clean Architecture, controllers are just the HTTP adapter over Application handlers.
+  - Handlers are injected per action with `[FromServices]`.
+  - `[ProducesResponseType]` keeps the OpenAPI types accurate.
+  - `[ApiController]`'s automatic 400s must follow the ADR-0008 error contract.
+
+**ADR-0009 (Communication & interaction)**
+- **Asked AI to:** decide protocol choices and request/response consistency.
+- **Accepted:** protocols per link; REST level 2 with `allowedTransitions` as the one affordance; the endpoint catalogue; `PUT /todos/{id}/state` for lifecycle, separate from the details update; representation rules (camelCase, lowercase enums, explicit nulls, a collection envelope); `ETag`/`If-Match` required on updates (428 if missing); no URL versioning, with additive-only evolution and API-first deploys; OpenAPI generated and committed, with a CI drift check.
+- **Naming confirmed by me:** `/todos/{id}/state` (a resource, a noun) rather than `/todos/{id}/transition` (an action or event, RPC style). "Transition" stays an internal domain term (`TodoTransitions`, `InvalidTodoTransitionException`, `allowedTransitions`).
+
+**ADR-0010 (Deployment & operations)**
+- **Asked AI to:** decide on CI/CD, GitHub Actions vs Azure Pipelines, App Gateway vs APIM vs ingress controller, AKS vs ACA/ACI/App Service, OpenAPI, environment strategy and release strategy.
+- **Accepted:**
+  - AKS (the only option meeting C-6/C-7)
+  - ~~Gateway API with Traefik~~, replaced by my decision below (APIM rejected; Application Gateway for Containers deferred)
+  - cert-manager with Let's Encrypt, on a free Azure DNS label
+  - GitHub Actions with OIDC and push-based Helm deploys
+  - four workflows, with two app charts for API-first ordering
+  - Key Vault as the pipeline's secret source, with Kubernetes Secrets created outside Helm
+  - local + CI + prod environments, with staging one values file away
+  - rolling updates with `--atomic`, and canary deferred
+- **Changed by me:** the edge uses Kubernetes `Ingress` with NGINX (`nginx.ingress.kubernetes.io` annotations). _[fill in your reason, e.g. familiarity with the annotations]_
+  - The AI flagged that the community ingress-nginx project is retired, so no more security fixes (R8).
+  - We chose the **Microsoft-managed AKS application routing add-on** as the controller: same annotations, patched with AKS.
+  - Gateway API is recorded as the migration target.
+  - _[✓ confirm the add-on's current support window]_
+- **To verify myself before the interview:** _[✓]_ run the full pipeline end to end (R7); _[✓]_ a deliberately failing release rolls back; _[✓]_ start the cluster and database well ahead (R6).
+
+**ADR-0011 (Technology & tooling → testing and quality)**
+- **Asked AI to:** select unit, integration, CI-integrated and front-end testing tools.
+- **Accepted:** xUnit v3 + Shouldly; Testcontainers + Respawn + `WebApplicationFactory` with real tokens; first-party `FakeTimeProvider` and `FakeLogger`; ArchUnitNET; Vitest + Testing Library + MSW + axe; Playwright; k6 (nightly, not a PR gate); size-limit + Lighthouse CI; gitleaks, Trivy (images and IaC), Dependabot, CodeQL where available.
+- **Selection principle I adopted:** licence and supply chain as an explicit criterion. FluentAssertions was rejected because of its commercial licence from v8.
+- **To check myself:** _[✓]_ the licence claims (FluentAssertions v8; CodeQL availability for my repository's plan); _[✓]_ the PR pipeline stays within about 5 minutes.
+- **Deliberate deviation to be ready to explain:** a stale `If-Match` returns **409**, not HTTP's 412, so all conflicts share one status and path through `TodoExceptionHandler` (T3). _[decide: keep 409, or switch to 412]_ _[decide: keep the broad types, or throw domain subclasses such as `TodoNotFoundException : KeyNotFoundException`]_

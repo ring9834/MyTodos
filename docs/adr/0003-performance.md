@@ -68,7 +68,7 @@ Q3 is the only performance requirement given. The other budgets below are **deri
 | **Read/write separation (CQRS)** | **No CQRS.** One data model and one database for reads and writes. Only a *light* separation in code: reads project straight to response models, and writes go through the entity and its state rules (§3.7) | Separate read models, read stores or databases; event sourcing; asynchronous projections |
 | **Data access** | Indexes that start with the owner; server-side paging (offset, bounded page size, stable sort); projection to response models; read-only queries without change tracking; bounded timeouts; connection pooling sized to the database's limits | Keyset (cursor) paging, read replicas, materialised views, an ORM-level second-level cache |
 | **Cloud** | API and database in the **same region (and zone where possible)**; right-sized tiers; the edge routes `/api/*` **directly** to the API | Multi-region; a CDN in front of the API |
-| **Measurement** | Automated latency test for Q3; a load-test tool for Q7; front-end budget checks; per-request duration logging | Full tracing and APM (deferred with the observability stack) |
+| **Measurement** | Automated latency test for Q3; a load-test tool for Q7; front-end budget checks; per-request duration from the ASP.NET Core instrumentation metric (`http.server.request.duration`, ADR-0008) | Full tracing and APM (deferred with the observability stack) |
 
 ---
 
@@ -294,11 +294,11 @@ Even then, the next step would be level 2 or 3, not level 4.
 |---|---|
 | **Data architecture** | Owner-first indexes for every list query; stable sort columns; optimistic concurrency (mechanism to choose); command timeouts |
 | **Communication & interaction** | Server-side paging parameters (page, page size ≤ 100) and total count; a dedicated state-change operation; mutations return the updated item; `Cache-Control: no-store` on API responses; the edge routes `/api/*` directly to the API |
-| **Component & structural** | One API service; command/query separation in code (CQRS level 1, §3.7), with its structure to be decided; client components for data; filter state in the URL; the map as a separately loaded component |
+| **Component & structural** | One API service; command/query separation in code (CQRS level 1, §3.7), realised as `Commands/` and `Queries/` folders in `Todo.Application` (ADR-0007); client components for data; filter state in the URL; the map as a separately loaded component |
 | **Deployment & operations** | API and database co-located; connection pool sizing rule; compression and static-asset caching at the edge; resource requests sized from load-test results |
 | **Scalability (quality attribute)** | Stateless, async API; the database as the scaling limit; pool sizing interacts with replica count |
 | **Technology & tooling** | TanStack Query; a load-test tool (e.g. k6); a front-end budget check (e.g. Lighthouse CI) |
-| **Cross-cutting concerns** | Per-request duration in structured logs |
+| **Cross-cutting concerns** | Per-request duration from automatic instrumentation (spans and metrics), not log lines (ADR-0008 §3.1) |
 | **Evolution & extensibility** | Triggers for a distributed cache, a CDN, keyset paging, background workers and read replicas |
 
 ---

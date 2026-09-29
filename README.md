@@ -22,11 +22,11 @@ This folder holds the project's Architecture Decision Records (ADRs). Each ADR r
 | → Testability and maintainability | SOLID; code organisation; DI; test seams; mocking policy; test strategy; designing for change (adding a status) | NFR-1, NFR-2, Q5, Q2 | [0005](0005-testability-and-maintainability.md) | Proposed (§3.2 superseded by 0007) |
 | **2. Inside vs. outside the system** | What is the system boundary? Who are the actors and external systems? Where are the trust boundaries? | FR-1 to FR-11, C-3, C-4 | — | Planned (trust boundaries started in 0001) |
 | **3. Data architecture** | Data access (EF Core vs Dapper); code-first vs database-first; running and evolving migrations; physical model; integrity; concurrency; roles; seeding; lifecycle and personal data | BR-1 to BR-6, Q1, Q3, Q4, Q5, Q6 | [0006](0006-data-architecture.md) | Proposed |
-| **4. Deployment & operations** | Azure topology; AKS setup; Terraform layout and state; Helm chart; edge/TLS; secrets; CI/CD; environments; rollback; teardown | C-4 to C-7, Q4, NFR-4, NFR-8, NFR-10 | — | Planned |
-| **5. Component & structural** | Containers; Clean Architecture projects (Api / Application / Domain / Infrastructure); modules as feature folders per layer; `IAppDbContext`; plain handlers; minimal APIs; rich domain; front-end feature folders | Q5, Q2, P-3, NFR-1 | [0007](0007-component-and-structural.md) | Proposed (supersedes 0005 §3.2) |
-| **6. Communication & interaction** | REST contract; routing (same-origin rewrite); error format; status semantics; paging; versioning | C-3, NFR-3, Q1, Q6 | — | Planned (routing constrained by 0001) |
-| **7. Cross-cutting concerns** | Logging and correlation; error handling; validation; configuration; time; auth plumbing | NFR-2, NFR-3, NFR-6 | — | Planned |
-| **8. Technology & tooling** | Core stack (frontend, backend, cloud, data store); other tools are chosen in their own area's ADR | C-1, C-2, C-4, A0, ADR-0001 §7 | [0002](0002-technology-stack.md) | Proposed |
+| **4. Deployment & operations** | Hosting (AKS vs ACA/ACI/App Service); edge (NGINX Ingress vs Gateway API vs App Gateway vs APIM); TLS; CI/CD (GitHub Actions vs Azure Pipelines); pipelines; images; Helm; Terraform; secrets delivery; environments; release strategy; operations | C-4 to C-7, Q4, NFR-4, NFR-5, NFR-10 | [0010](0010-deployment-and-operations.md) | Proposed |
+| **5. Component & structural** | Containers; Clean Architecture projects (Api / Application / Domain / Infrastructure); modules as feature folders per layer; `IAppDbContext`; plain handlers; controller-based RESTful API; rich domain; front-end feature folders | Q5, Q2, P-3, NFR-1 | [0007](0007-component-and-structural.md) | Proposed (supersedes 0005 §3.2) |
+| **6. Communication & interaction** | Protocols per link; REST level 2; endpoint catalogue and status codes; representation rules; `ETag`/`If-Match`; idempotency and retries; content negotiation; versioning and evolution; OpenAPI contract and drift check | C-3, Q1, Q2, Q4, Q6, NFR-3 | [0009](0009-communication-and-interaction.md) | Proposed |
+| **7. Cross-cutting concerns** | Observability (logging, correlation, metrics, tracing, alerting); error taxonomy and contract; exception strategy; validation; configuration and secrets; feature flags; health checks | NFR-2, NFR-3, NFR-5, NFR-6, Q3, Q4 | [0008](0008-cross-cutting-concerns.md) | Proposed |
+| **8. Technology & tooling** | Core stack (frontend, backend, cloud, data store); testing and quality tooling; other tools chosen in their own area's ADR | C-1, C-2, C-4, A0, ADR-0001 §7, NFR-1 | [0002](0002-technology-stack.md), [0011](0011-testing-and-quality-tooling.md) | Proposed |
 | **9. Evolution & extensibility** | Federated sign-in; mobile client; customers; API versioning; what is designed to be easy to change | Deferred items (requirements §10.3) | — | Planned |
 
 ## Suggested order for the remaining decisions
@@ -57,11 +57,12 @@ The whole stack in one place, with the ADR that chose each technology.
 | PostgreSQL (managed) | Open choice | [0002](0002-technology-stack.md) |
 | TanStack Query (server state); URL parameters for filters | Open choice | [0003](0003-performance.md) |
 | Load testing (e.g. k6); front-end budget checks (e.g. Lighthouse CI) | Open choice | [0003](0003-performance.md) |
-| xUnit, Testcontainers, FakeTimeProvider, NSubstitute (sparingly); Vitest, Testing Library, MSW, Playwright; an OpenAPI → TypeScript generator | Open choice | [0005](0005-testability-and-maintainability.md) |
+| xUnit v3, Shouldly, NSubstitute (sparingly), `FakeTimeProvider`, `FakeLogger`, `WebApplicationFactory`, Testcontainers, Respawn, ArchUnitNET, WireMock.Net; Vitest (jsdom), Testing Library, MSW v2, vitest-axe, Playwright (+ axe); k6; Lighthouse CI; size-limit; gitleaks, Trivy, Dependabot, CodeQL, tflint, kubeconform | Open choice | [0011](0011-testing-and-quality-tooling.md) |
 | Built-in .NET DI container | Open choice | [0005](0005-testability-and-maintainability.md) |
-| ASP.NET Core minimal APIs; an architecture-test library (e.g. ArchUnitNET / NetArchTest) | Open choice | [0007](0007-component-and-structural.md) |
+| ASP.NET Core MVC controllers (`[ApiController]`) | Open choice | [0007](0007-component-and-structural.md) |
 | REST over HTTP/JSON (API style) | Open choice | [0004](0004-scalability.md) |
 | Kubernetes Horizontal Pod Autoscaler | Open choice (within mandated Kubernetes) | [0004](0004-scalability.md) |
-| Edge / TLS, CI/CD platform | Open choice | Deployment & Operations (planned) |
+| HTTPS/HTTP/2 at the edge; `ETag`/`If-Match`; ASP.NET Core OpenAPI (build-time) + `openapi-typescript` | Open choice | [0009](0009-communication-and-interaction.md) |
+| AKS (Cilium network policy, workload identity); NGINX Ingress (`nginx.ingress.kubernetes.io`, AKS application routing add-on); cert-manager + Let's Encrypt; GitHub Actions (OIDC); ACR; Key Vault (pipeline secrets); two Helm charts | Constrained / open choices | [0010](0010-deployment-and-operations.md) |
 | EF Core + Npgsql; code-first migrations run as a migration bundle; snake_case naming convention | Open choice | [0006](0006-data-architecture.md) |
-| Logging, validation, configuration | Open choice | Cross-cutting Concerns (planned) |
+| Built-in .NET logging (JSON console); OpenTelemetry (OTLP / Azure Monitor, export off by default); Aspire dashboard (local); ASP.NET Core built-in ProblemDetails (RFC 9457) + `IExceptionHandler` (`TodoExceptionHandler`); `Microsoft.FeatureManagement` (when needed) | Open choice | [0008](0008-cross-cutting-concerns.md) |

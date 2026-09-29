@@ -36,7 +36,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 |---|---|---|
 | Add a field end to end, by hand | < 30 min | Q5 (requirement) |
 | Add a new status end to end, by hand (§3.6) | < 30 min | Derived |
-| Files touched when adding a field (including migration, UI and tests) | ≤ ~14 (was ~8 before ADR-0007's layering) | Derived (change-amplification check) |
+| Files touched when adding a field (including migration, UI and tests) | ≤ ~12 (was ~8 before ADR-0007's layering) | Derived (change-amplification check) |
 | Full test suite in CI | < 5 min | Derived (fast feedback) |
 | Build warnings | 0 (warnings treated as errors) | Derived |
 
@@ -105,7 +105,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 | Service locator (resolving services manually inside code) | Rejected | Hides dependencies, making code harder to read and test |
 
 **Rules:**
-- Constructor injection in classes; parameter injection in minimal-API endpoint handlers.
+- Constructor injection in classes; action-level `[FromServices]` injection of use-case handlers in controllers (ADR-0007 §3.7).
 - **Lifetimes:** the ORM context is *scoped* (one per request); `TimeProvider` is a *singleton*; the current-user service is *scoped* (it reads the request's identity).
 - **Validate on start-up:** scope and build validation are enabled in development and tests, so a lifetime mistake (such as a singleton capturing a scoped context) fails immediately instead of at runtime.
 - Registrations are grouped per module (`AddTodos()`, `AddAuth()`) so each module's wiring is visible in one place.
@@ -170,7 +170,7 @@ The shape is the "testing trophy" rather than a strict pyramid: **integration te
 | Level | What | Tools | Proves |
 |---|---|---|---|
 | **Static** | Types, nullability, analysers, linters | C# compiler (nullable, warnings as errors), analysers, TypeScript `strict`, ESLint | Whole classes of bugs never reach runtime |
-| **Unit** | Pure rules: the transition table, validators, mapping | xUnit | Q2 (all from/to pairs), BR-1 to BR-5 |
+| **Unit** | Pure rules: the transition table, domain guard clauses, mapping, the exception-handler table | xUnit | Q2 (all from/to pairs), BR-1 to BR-5 |
 | **API integration** (the backbone) | The real HTTP pipeline + real auth + real PostgreSQL | xUnit, `WebApplicationFactory`, Testcontainers (PostgreSQL), a database reset between tests (e.g. Respawn) | Q1, Q6, Q8, Q3, NFR-2, NFR-3, the error format |
 | **UI component** | Components with real hooks against a mocked network | Vitest, Testing Library (queries by role and label), MSW | FR behaviour, validation messages, optimistic rollback, NFR-9 |
 | **End-to-end smoke** | One journey through the deployed system: sign in → create → schedule → complete | Playwright | The deployed wiring (Should) |
@@ -307,7 +307,7 @@ public static class TodoTransitions
 
 | Decision area | Constraint or input from this decision |
 |---|---|
-| **Component & structural** | Decided in ADR-0007: Clean Architecture projects with feature folders per layer; a pure domain core; no repository, mediator or mapper layers; minimal APIs |
+| **Component & structural** | Decided in ADR-0007: Clean Architecture projects with feature folders per layer; a pure domain core; no repository, mediator or mapper layers; controllers (`[ApiController]`) |
 | **Communication & interaction** | OpenAPI is the contract; each item's response includes `allowedTransitions`; a validation error format the UI can map onto form fields |
 | **Data architecture** | State stored as a string; whether to add a check constraint (integrity vs one migration line per new status); the ORM used directly |
 | **Cross-cutting concerns** | The validation approach (library or built-in); `TimeProvider` everywhere instead of the static clock; options for configuration |
@@ -321,7 +321,7 @@ public static class TodoTransitions
 
 | Check | How | Target |
 |---|---|---|
-| Add a field (Q5) | Timed manual drill, without AI | < 30 min; ≤ ~14 files (ADR-0007 §3.10) |
+| Add a field (Q5) | Timed manual drill, without AI | < 30 min; ≤ ~12 files (ADR-0007 §3.10) |
 | Add a status (§3.6) | Timed manual drill: add `in_progress` on a branch, then discard it | < 30 min; about 5 files |
 | Q2 matrix | Table-driven unit test over every (from, to) pair, plus the completeness test | Every pair covered |
 | No mocked ORM | Code review; no mock of the ORM context in test projects | 0 instances |
