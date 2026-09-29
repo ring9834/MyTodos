@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: helm lint deploy/helm/todo-planner
       - name: Render chart
         run: helm template deploy/helm/todo-planner --values deploy/helm/todo-planner/values.yaml > rendered.yaml
@@ -162,7 +162,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - uses: azure/aks-set-context@v4
         with: { resource-group: rush-todo-dev-rg, cluster-name: rush-todo-dev-aks }
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: |
           helm upgrade --install todo deploy/helm/todo-planner \
             --set api.image.tag=${{ github.sha }} \
