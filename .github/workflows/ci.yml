@@ -160,7 +160,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - uses: azure/aks-set-context@v4
+      - uses: azure/aks-set-context@v5
         with: { resource-group: rush-todo-dev-rg, cluster-name: rush-todo-dev-aks }
       - uses: azure/setup-helm@v4
       - run: |
