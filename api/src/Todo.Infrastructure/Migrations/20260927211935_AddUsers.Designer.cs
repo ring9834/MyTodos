@@ -12,8 +12,8 @@ using Todo.Infrastructure;
 namespace Todo.Infrastructure.Migrations
 {
     [DbContext(typeof(TodoDbContext))]
-    [Migration("20260930847935_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260927211935_AddUsers")]
+    partial class AddUsers
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -75,6 +75,29 @@ namespace Todo.Infrastructure.Migrations
                     b.HasIndex("OwnerId", "State");
 
                     b.ToTable("Todos");
+                });
+
+            modelBuilder.Entity("Todo.Domain.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("Users");
                 });
 #pragma warning restore 612, 618
         }

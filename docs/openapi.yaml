@@ -1,0 +1,278 @@
+openapi: 3.0.3
+info:
+  title: Todo Planner API
+  version: "1.0"
+  description: >
+    CRUD API for todo items with state and location, owned per user.
+    Auth: JWT delivered via httpOnly cookie (ADR-0002/0007). All /todos
+    endpoints require authentication; results are always scoped to the
+    caller's OwnerId (Q1). Errors use RFC 9457 ProblemDetails.
+
+servers:
+  - url: /api
+
+security:
+  - cookieAuth: []
+
+paths:
+  /auth/register:
+    post:
+      summary: Self-issue a new account (ADR-0007 — minimal, not a real IdP)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, minLength: 3 }
+                password: { type: string, format: password, minLength: 8 }
+      responses:
+        '201': { description: Account created; Set-Cookie header carries the JWT }
+        '409': { description: Username already taken }
+
+  /auth/login:
+    post:
+      summary: Authenticate and receive a JWT session cookie (self-issued, per ADR-0007/A6)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Authenticated; Set-Cookie header carries the JWT
+        '401':
+          description: Invalid credentials
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /auth/logout:
+    post:
+      summary: Clear the session cookie
+      responses:
+        '204': { description: Logged out }
+
+  /todos:
+    get:
+      summary: List the caller's todos, paginated and optionally filtered by state (Q3)
+      parameters:
+        - name: state
+          in: query
+          schema: { $ref: '#/components/schemas/TodoState' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TodoPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create a todo (OwnerId set from the caller's token, never from the request body)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TodoCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
+          headers:
+            ETag: { schema: { type: string }, description: "Concurrency token (xmin), ADR-0004" }
+        '400': { $ref: '#/components/responses/ValidationProblem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /todos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Get a single todo. Not owned by the caller -> 404, never 403 (Q1 — don't leak existence)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
+          headers:
+            ETag: { schema: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update a todo. Requires If-Match with the current ETag (optimistic concurrency, Q6/ADR-0004)
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TodoUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
+        '400': { $ref: '#/components/responses/ValidationProblem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Concurrency conflict — the todo changed since the ETag was read (Q6)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+    delete:
+      summary: Delete a todo
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /todos/{id}/transition:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      summary: Move a todo to a new state, enforcing the legal-transition rules (A3, Q2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetState]
+              properties:
+                targetState: { $ref: '#/components/schemas/TodoState' }
+                scheduledFor:
+                  type: string
+                  format: date-time
+                  description: Required when targetState is 'scheduled'
+      responses:
+        '200':
+          description: Transitioned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Illegal transition for the todo's current state (Q2 — e.g. done -> scheduled)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: todo_session   # httpOnly, Secure, SameSite=Lax JWT cookie — ADR-0002
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid session
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Not found or not owned by the caller (Q1)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    ValidationProblem:
+      description: Validation failure
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+    TodoState:
+      type: string
+      enum: [todo, scheduled, done]   # A3
+
+    Location:
+      type: object
+      description: Free-text address, optional coordinates; geocoding deferred (A1)
+      required: [address, latitude, longitude]
+      properties:
+        address: { type: string, maxLength: 500 }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+
+    TodoCreate:
+      type: object
+      required: [title, location]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        location: { $ref: '#/components/schemas/Location' }
+
+    TodoUpdate:
+      type: object
+      required: [title, location]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        location: { $ref: '#/components/schemas/Location' }
+
+    Todo:
+      type: object
+      required: [id, title, state, location, scheduledFor, createdAt, updatedAt, eTag]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        state: { $ref: '#/components/schemas/TodoState' }
+        location: { $ref: '#/components/schemas/Location' }
+        scheduledFor: { type: string, format: date-time, nullable: true }   # A2 — always present in the payload; null when unscheduled
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        eTag:
+          type: string
+          description: >
+            Concurrency token (from PostgreSQL's xmin, ADR-0004). Exposed in the body,
+            not only as the ETag response header, because the list endpoint returns many
+            items in one response and a single HTTP header can't carry a per-item value.
+            Send back unchanged via If-Match on PUT.
+
+    TodoPage:
+      type: object
+      required: [items, page, pageSize, totalCount]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Todo' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalCount: { type: integer }
+
+    ProblemDetails:   # RFC 9457
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
