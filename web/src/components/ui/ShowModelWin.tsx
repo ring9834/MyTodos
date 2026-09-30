@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useDeleteTodo, useTransitionTodo, useUpdateTodo } from "../../lib/use-todos";
+import { useDeleteTodo } from "../../lib/use-todos";
 
 const stateStyles: Record<string, { border: string; dot: string }> = {
   todo: { border: "border-l-moss-600", dot: "bg-moss-600" },
@@ -11,11 +11,12 @@ const stateStyles: Record<string, { border: string; dot: string }> = {
 
 export function ModelWindow({ id }: { id: string  }) {
   const [isOpen, setIsOpen] = useState(false);
+  
+  const del = useDeleteTodo();
 
   function handleSigal(flag: boolean) {
     setIsOpen(flag);
     if (flag) {
-      const del = useDeleteTodo();
       del.mutate(id);
       setIsOpen(false);
     }
