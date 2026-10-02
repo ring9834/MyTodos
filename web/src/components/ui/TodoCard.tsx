@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useDeleteTodo, useTransitionTodo, useUpdateTodo } from "../../lib/use-todos";
 import { ConcurrencyConflictError, type TodoDto } from "../../lib/todos-api";
+import { DeleteModalContext } from "./contexts/DeleteModalContext";
 
 const stateStyles: Record<string, { border: string; dot: string }> = {
   todo: { border: "border-l-moss-600", dot: "bg-moss-600" },
@@ -18,8 +19,10 @@ export function TodoCard({ todo }: { todo: TodoDto }) {
 
   const transition = useTransitionTodo();
   const update = useUpdateTodo();
-  const del = useDeleteTodo();
+  //const del = useDeleteTodo();
   const style = stateStyles[todo.state] ?? stateStyles.todo;
+
+  const requestDelete = useContext(DeleteModalContext);
 
   function handleSave() {
     update.mutate(
@@ -126,8 +129,7 @@ export function TodoCard({ todo }: { todo: TodoDto }) {
           Edit
         </button>
         <button
-          onClick={() => del.mutate(todo.id)}
-          disabled={del.isPending}
+          onClick={() => requestDelete(todo.id)}
           className="h-9 rounded-md border border-danger/40 px-3 text-sm text-danger hover:bg-danger/5 disabled:opacity-50"
         >
           Delete

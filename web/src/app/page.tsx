@@ -1,8 +1,34 @@
+"use client";
+
+import { useState } from "react";
 import { AuthGate } from "../components/auth/AuthGate";
 import { TodoForm } from "../components/ui/TodoForm";
 import { TodoList } from "../components/ui/TodoList";
+import { DeleteModalContext } from "../components/ui/contexts/DeleteModalContext";
+import { ModelWindow } from "../components/ui/ShowModelWin";
+import { useDeleteTodo } from "../lib/use-todos";
 
 export default function Home() {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const requestDelete = (id: string) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    // Perform the delete action here using the pendingDeleteId
+    console.log("Deleting todo with id:", pendingDeleteId);
+    del.mutate(pendingDeleteId!);
+
+    // After deletion, reset the pendingDeleteId
+    setPendingDeleteId(null);
+  };
+
+  const handleCancelDelete = () => {
+    setPendingDeleteId(null);
+  };
+
+  const del = useDeleteTodo();
+
   return (
     <AuthGate>
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
@@ -19,8 +45,12 @@ export default function Home() {
           <div className="md:sticky md:top-8">
             <TodoForm />
           </div>
-          <TodoList />
+          <DeleteModalContext.Provider value={requestDelete}>
+            <TodoList />
+          </DeleteModalContext.Provider>
         </div>
+
+        <ModelWindow id={pendingDeleteId ?? ""} show={!!pendingDeleteId} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />
       </main>
     </AuthGate>
   );
