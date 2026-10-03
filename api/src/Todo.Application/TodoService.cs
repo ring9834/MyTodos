@@ -66,13 +66,12 @@ public class TodoService
         return ToDto(todo);
     }
 
-    // Q6/ADR-0004: If-Match's value is the eTag the client last saw, sourced from the list
+    // If-Match's value is the eTag the client last saw, sourced from the list
     // body (not a header, per the openapi.yaml gap this slice fixed). We set it as the
     // shadow xmin property's ORIGINAL value, so EF Core's own optimistic-concurrency check
     // (comparing that original against the row's *actual* current xmin at UPDATE time)
     // throws DbUpdateConcurrencyException — already mapped to 409 (TodoExceptionHandler) —
-    // if someone else changed the row in between. NOT VERIFIED — no NuGet access to compile
-    // or run this; this is the most advanced EF Core pattern in the project so far.
+    // if someone else changed the row in between. this is the most advanced EF Core pattern in the project so far.
     public async Task<TodoDto> UpdateAsync(
         Guid ownerId, Guid todoId, UpdateTodoRequest request, string ifMatch, CancellationToken ct)
     {

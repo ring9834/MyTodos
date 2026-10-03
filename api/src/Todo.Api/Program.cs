@@ -75,8 +75,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
-builder.Services.AddProblemDetails();
+// AddProblemDetails() plus UseExceptionHandler() so every error is RFC 7807 JSON
+builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
+{
+    ctx.ProblemDetails.Extensions.Remove("traceId");                       // §3.2: no traceId
+    if (ctx.ProblemDetails.Status == StatusCodes.Status400BadRequest)
+        ctx.ProblemDetails.Extensions.TryAdd("code", "validation_failed");  // [ApiController] model-binding 400s
+});
 builder.Services.AddExceptionHandler<Todo.Api.Middleware.TodoExceptionHandler>();
+// §3.1: the handler's single ILogger call is the only record of a handled exception
+builder.Services.Configure<ExceptionHandlerOptions>(o => o.SuppressDiagnosticsCallback = _ => true);
 
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddService("todo-api"))
@@ -119,6 +127,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseStatusCodePages();   // ProblemDetails bodies for bare 401 / 405 / 415 / 429
 
 // Authentication/authorization MUST be registered before any Map* calls in the minimal
 // hosting model — interleaving them with endpoint mapping is a well-documented source of
