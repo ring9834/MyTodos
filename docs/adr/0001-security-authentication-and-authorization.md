@@ -175,15 +175,15 @@ Every layer assumes the ones outside it might fail.
 
 | # | Layer | Tactics | MVP |
 |---|---|---|---|
-| 1 | **Network edge** | A single public entry point; TLS terminated at the edge (NFR-10, promoted); HSTS. The API and data store have no public entry of their own | ✅ |
-| 2 | **In-cluster network** | Network policies: the API accepts traffic only from the edge (and web tier, if relevant); only the API can reach the data store | ✅ (Should) |
-| 3 | **Transport to data** | Data-store connections require TLS | ✅ |
-| 4 | **Application edge** | Rate limiting on sign-in; security headers on UI responses (CSP, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`); request size limits | ✅ |
-| 5 | **Identity** | Token validation (section 4.2); hashed passwords; generic sign-in errors; equalised timing | ✅ |
-| 6 | **Authorization and data** | Deny by default; the owner filter on every query; server-side validation; parameterised queries only (no string-built SQL) | ✅ |
-| 7 | **Secrets and runtime** | The signing key, data-store password and seed passwords come from the platform's secret store, populated by the pipeline, never from git or images. Containers run as non-root, with a read-only root filesystem, dropped capabilities and resource limits | ✅. A managed secrets vault is deferred |
-| 8 | **Supply chain and delivery** | The pipeline authenticates to the cloud via **workload identity federation** (OIDC; no stored cloud secret); dependency vulnerability checks; pinned base images; image scanning; secret scanning | ✅ except image scanning (Should) |
-| — | **Detection** | Sign-in outcomes observed through automatic request instrumentation: rates of 200 / 401 / 429 on the sign-in route, with an alert on spikes. No per-user sign-in log lines (application code doesn't log; ADR-0008 §3.1). Passwords and tokens never appear in telemetry (NFR-6) | ✅ (per-user audit log deferred; ADR-0008 R10) |
+| 1 | **Network edge** | A single public entry point; TLS terminated at the edge (NFR-10, promoted); HSTS. The API and data store have no public entry of their own | yes |
+| 2 | **In-cluster network** | Network policies: the API accepts traffic only from the edge (and web tier, if relevant); only the API can reach the data store | yes (Should) |
+| 3 | **Transport to data** | Data-store connections require TLS | yes |
+| 4 | **Application edge** | Rate limiting on sign-in; security headers on UI responses (CSP, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`); request size limits | yes |
+| 5 | **Identity** | Token validation (section 4.2); hashed passwords; generic sign-in errors; equalised timing | yes |
+| 6 | **Authorization and data** | Deny by default; the owner filter on every query; server-side validation; parameterised queries only (no string-built SQL) | yes |
+| 7 | **Secrets and runtime** | The signing key, data-store password and seed passwords come from the platform's secret store, populated by the pipeline, never from git or images. Containers run as non-root, with a read-only root filesystem, dropped capabilities and resource limits | yes. A managed secrets vault is deferred |
+| 8 | **Supply chain and delivery** | The pipeline authenticates to the cloud via **workload identity federation** (OIDC; no stored cloud secret); dependency vulnerability checks; pinned base images; image scanning; secret scanning | yes except image scanning (Should) |
+| — | **Detection** | Sign-in outcomes observed through automatic request instrumentation: rates of 200 / 401 / 429 on the sign-in route, with an alert on spikes. No per-user sign-in log lines (application code doesn't log; ADR-0008 §3.1). Passwords and tokens never appear in telemetry (NFR-6) | yes (per-user audit log deferred; ADR-0008 R10) |
 
 ---
 
