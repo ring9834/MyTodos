@@ -1,6 +1,6 @@
 # Architecture Decision Records: index and decision map
 
-This folder holds the project's Architecture Decision Records (ADRs). Each ADR records one significant decision: its context, the options considered, the decision, and its consequences. The decisions are organised into nine **decision areas**.
+These are the project's Architecture Decision Records (ADRs). Each ADR records one significant decision: its context, the options considered, the decision, and its consequences. The decisions are organised into nine **decision areas**.
 
 ## Conventions
 
