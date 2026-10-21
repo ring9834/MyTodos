@@ -187,7 +187,7 @@ The shape is the "testing trophy" rather than a strict pyramid: **integration te
 
 **Should this be in scope?** Yes, **but only as "cheap to change", not as "configurable".** It is the one axis of change that is easy to foresee: workflows evolve, and it is also a *likely live interview task*. Making it cheap costs almost nothing now. Making it configurable costs a great deal (see option D).
 
-A new status is **not only data**. Someone must decide its rules: which transitions are allowed? Does it need a date (like BR-1)? Is it editable (like BR-3)? What does the gardener see? Those are **requirements decisions**. No configuration can avoid them, so "no code change" would only move the logic somewhere less visible and less tested.
+A new status is **not only data**. Someone must decide its rules: which transitions are allowed? Does it need a date (like BR-1)? Is it editable (like BR-3)? What does the worker see? Those are **requirements decisions**. No configuration can avoid them, so "no code change" would only move the logic somewhere less visible and less tested.
 
 | Option | Adding a status requires | Verdict |
 |---|---|---|

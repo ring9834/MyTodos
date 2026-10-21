@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Grounded in the subject: a gardener's field day-sheet, not a generic SaaS palette.
+  /* Grounded in the subject: a worker's field day-sheet, not a generic SaaS palette.
      Moss green is the primary accent (not terracotta) on a cool sage-parchment ground. */
   --color-bg: #eff1e9;
   --color-surface: #ffffff;

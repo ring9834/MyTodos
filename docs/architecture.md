@@ -13,7 +13,7 @@
 
 ## 1. The system at a glance
 
-**What it is:** an API-driven web application in which gardeners record jobs (Todo items) at customer locations and plan each day's work. Each item has a title, a state (`todo`, `scheduled`, `done`) and a location (an address plus an optional map point).
+**What it is:** an API-driven web application in which workers record jobs (Todo items) at customer locations and plan each day's work. Each item has a title, a state (`todo`, `scheduled`, `done`) and a location (an address plus an optional map point).
 
 **Shape:** a **Next.js (React) web tier** and a **.NET API**, organised as a **modular monolith with Clean Architecture layers**, backed by **managed PostgreSQL**. It runs on **AKS**, is provisioned by **Terraform**, and is deployed by **Helm** from **GitHub Actions**.
 
@@ -80,7 +80,7 @@ These principles recur across the ADRs. They are the shortest way to explain *wh
 
 ```mermaid
 flowchart LR
-    U([Gardener's browser]) -- HTTPS · HTTP/2 --> I[NGINX Ingress<br/>TLS · routing]
+    U([Worker's browser]) -- HTTPS · HTTP/2 --> I[NGINX Ingress<br/>TLS · routing]
     subgraph AKS[AKS cluster]
         I -- "/" --> W[Next.js web<br/>static shell + client components]
         I -- "/api/*" --> A[.NET API<br/>modular monolith]

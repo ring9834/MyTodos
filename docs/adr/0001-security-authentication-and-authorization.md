@@ -47,7 +47,7 @@ Security reasoning starts from **trust boundaries**: the places where data cross
 
 ```mermaid
 flowchart LR
-    U([Gardener's browser<br/>React UI]) -- "TB1: internet → edge<br/>TLS, rate limiting" --> E[Edge<br/>single public entry point]
+    U([Worker's browser<br/>React UI]) -- "TB1: internet → edge<br/>TLS, rate limiting" --> E[Edge<br/>single public entry point]
     subgraph K["Kubernetes cluster (trusted zone)"]
         E -- "/ (UI assets)" --> W[Web tier]
         E -- "/api/*" --> A[API]
@@ -143,7 +143,7 @@ sequenceDiagram
 | Signing | HMAC-SHA256 (HS256) with a random key of at least 256 bits, from a secret | One service both issues and validates. Asymmetric keys add value only when the issuer is separate (it will be, after federation) |
 | Claims | `sub` (user id), `name`, `iat`, `exp`, `iss`, `aud` | Minimum needed; no personal data beyond the username |
 | Validation | Issuer, audience, lifetime, signature; algorithm pinned to HS256; clock skew of 1 minute | Prevents algorithm-confusion attacks and tokens meant for other systems |
-| Lifetime | **8 hours** (configurable); no refresh token | One working day, with no mid-shift re-login for a gardener. This is a trade-off (T5) |
+| Lifetime | **8 hours** (configurable); no refresh token | One working day, with no mid-shift re-login for a worker. This is a trade-off (T5) |
 
 ### 4.3 Cookie and CSRF protection
 

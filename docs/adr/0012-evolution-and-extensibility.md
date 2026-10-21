@@ -199,7 +199,7 @@ Each one is **already paid for** by an earlier decision. None was added "for fle
 | A plugin architecture | No third-party extension requirement | External developers extending the product |
 | **A configurable workflow engine** (statuses in the database, an admin UI) | Status rules need code and requirements decisions anyway (ADR-0005 §3.6 D) | Non-developers changing workflows often, or different workflows per tenant |
 | **Custom fields** (EAV or `jsonb` attributes) | Every attribute is known; an explicit schema is clearer, faster and validated | Users defining their own attributes |
-| Multi-tenancy plumbing (tenant resolution, per-tenant config) | Single-owner model (A4); E3 keeps the path open | Organisations or teams of gardeners |
+| Multi-tenancy plumbing (tenant resolution, per-tenant config) | Single-owner model (A4); E3 keeps the path open | Organisations or teams of workers |
 | A database-agnostic data layer | PostgreSQL chosen for its features (`xmin`, PostGIS); abstracting them away would remove the value | A requirement to support several databases |
 | "Microservice-ready" ceremony (message contracts, service discovery) | A modular monolith with clean boundaries already keeps extraction possible (E4) | ADR-0004's extraction triggers |
 | A GraphQL layer "for future clients" | REST + OpenAPI serves every known client | Several clients with divergent data needs |
@@ -220,7 +220,7 @@ Every deferred item in one place. **Triggers are observable.** Each item has a f
 | V6 | **Customers as an entity** (A8, FR-14) | Customer reporting or reuse | A new `Customers` module; `todo_items.customer_id` (nullable, then backfilled) | 0006, 0007, 0009 | M |
 | V7 | **Geocoding / address search** (FR-12) | Users need to search addresses | An outbound adapter + resilience handler + WireMock tests; a queue if slow | 0004, 0008, 0011 | M |
 | V8 | **Location features** (near me, route order, FR-16) | A prioritised location feature | Enable PostGIS; `geography(Point)` via expand/contract; a spatial index | 0002, 0003, 0006 | M–L |
-| V9 | **Organisations / multi-tenancy** | Teams of gardeners sharing jobs | Owner → organisation membership; the filter change; RLS | 0001, 0004, 0006 | L |
+| V9 | **Organisations / multi-tenancy** | Teams of workers sharing jobs | Owner → organisation membership; the filter change; RLS | 0001, 0004, 0006 | L |
 | V10 | **Real-time multi-device sync** | Stale data complaints despite refetch on focus | Server-sent events + a backplane | 0004, 0009 | M |
 | V11 | **Offline use** (A7) | Field use without connectivity | PWA + local store + a sync / conflict strategy | 0003, 0009 | L |
 | V12 | **Read scaling** (caching, replicas, CQRS level 2–3) | A measured budget missed after indexing | Measure → distributed cache or read replica | 0003, 0004 | M |

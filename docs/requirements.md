@@ -12,7 +12,7 @@
 
 ## 1. Purpose
 
-Build an API-driven application that tracks Todo items, each with an associated location. The reference scenario is a gardener planning each day's services across multiple customers.
+Build an API-driven application that tracks Todo items, each with an associated location. The reference scenario is a worker planning each day's services across multiple customers.
 
 The brief is deliberately larger than the time available, so this document does four things:
 1. It separates **hard constraints** from **open choices**.
@@ -59,12 +59,12 @@ These are not product requirements, but they create requirements of their own.
 
 ### 3.1 Scenario reading
 
-"A gardener planning each day's services for multiple customers" implies:
+"A worker planning each day's services for multiple customers" implies:
 - A **Todo item is a job or service visit**, for example "Mow lawn and trim hedges".
 - The **location is where the job happens**: the customer's address.
 - **`scheduled` only makes sense with a date.** Planning *each day* means items must be assignable to a day.
 - The primary workflow is **"what am I doing today, and where?"**
-- Each gardener's jobs are **their own** (A4). One user must never see or change another user's jobs.
+- Each worker's jobs are **their own** (A4). One user must never see or change another user's jobs.
 
 ### 3.2 Glossary
 
@@ -111,7 +111,7 @@ All assumptions are **proposed** and need product-owner confirmation. Each has a
 | # | Question | Assumption | Reason | Revisit if |
 |---|---|---|---|---|
 | A0 | Which role type applies? | The chosen backend option is permitted for this role | C-2 restricts the options by role | The role specifies Java |
-| A1 | What is "location"? | A free-text address, plus an optional map point (latitude/longitude); address search (geocoding) is deferred | Matches "gardener planning services" without depending on a geocoding service for the MVP | Users need to search for addresses |
+| A1 | What is "location"? | A free-text address, plus an optional map point (latitude/longitude); address search (geocoding) is deferred | Matches "worker planning services" without depending on a geocoding service for the MVP | Users need to search for addresses |
 | A2 | Does "scheduled" carry a date? | Yes. A scheduled date is required when the state is `scheduled`, and is otherwise absent | "Plan each day's services" is meaningless without one | Time-of-day slots are needed |
 | A3 | Which state transitions are legal? | `todo → scheduled → done`, plus `scheduled → todo` (unschedule) and rescheduling to another date. No transition out of `done` | The simplest model that supports the domain story; a clear rule to defend | Users need to reopen work or complete ad-hoc jobs directly |
 | A4 | Single-user or multi-user? | Multi-user from day one: every item has an owner, and users can only access their own items | Cheap to build in now, expensive to retrofit; also provides a real security scenario (Q1) | — |
@@ -150,37 +150,37 @@ All assumptions are **proposed** and need product-owner confirmation. Each has a
 ## 6. User stories and acceptance criteria
 
 **US-1: Sign in** (FR-1)
-As a gardener, I want to sign in, so that only I can see and manage my jobs.
+As a worker, I want to sign in, so that only I can see and manage my jobs.
 - *Given* valid credentials, *when* I sign in, *then* I see my own jobs, and nobody else's.
 - *Given* invalid credentials, *when* I sign in, *then* I am refused access, without being told which part was wrong.
 - *Given* I am not signed in, *when* I try to open the job list, *then* I am asked to sign in.
 
 **US-2: Capture a job** (FR-2, FR-8)
-As a gardener, I want to record a job with where it is, so that I don't forget it.
+As a worker, I want to record a job with where it is, so that I don't forget it.
 - *Given* a valid title and address, *when* I save, *then* the item appears in my list with the state I chose.
 - *Given* the state is `scheduled` and no date is set, *when* I save, *then* I am told a scheduled item needs a date, and nothing is saved.
 - *Given* an empty title or address, *when* I save, *then* I am told which field is required.
 
 **US-3: Plan my day** (FR-7, FR-9)
-As a gardener, I want to assign jobs to a day and see a day's jobs, so that I can plan my work.
+As a worker, I want to assign jobs to a day and see a day's jobs, so that I can plan my work.
 - *Given* an item in `todo`, *when* I set a date and change the state to `scheduled`, *then* it appears when I filter by that date.
 - *Given* a scheduled item, *when* I unschedule it, *then* it returns to `todo` and no longer appears under that date.
 - *Given* many items, *when* I filter by state and date, *then* only matching items are shown, earliest date first, one page at a time.
 
 **US-4: Complete a job** (FR-7, FR-8)
-As a gardener, I want to mark a job done from the list, so that I can track progress during the day.
+As a worker, I want to mark a job done from the list, so that I can track progress during the day.
 - *Given* a scheduled item, *when* I mark it `done`, *then* its new state is shown straight away.
 - *Given* a `todo` item, *then* "done" is not offered as an option.
 - *Given* a `done` item, *then* no state change is offered, and any attempt to change it is rejected with an explanation.
 
 **US-5: Correct or remove a job** (FR-5, FR-6)
-As a gardener, I want to fix or remove jobs, so that my list stays accurate.
+As a worker, I want to fix or remove jobs, so that my list stays accurate.
 - *Given* an item that is not `done`, *when* I edit its title or location and save, *then* the changes are kept.
 - *Given* any of my items, *when* I delete it and confirm, *then* it no longer appears.
 - *Given* the item was changed elsewhere after I opened it, *when* I save, *then* I am told it has changed, and the other change is not overwritten (Q6).
 
 **US-6: Place a job on the map** (FR-10, FR-11)
-As a gardener, I want to mark exactly where a job is, so that I can find it.
+As a worker, I want to mark exactly where a job is, so that I can find it.
 - *Given* the job form is open, *when* I pick a point on the map, *then* that position is attached to the job and shown with a marker.
 
 ---

@@ -33,7 +33,7 @@ const ibmPlexSans = localFont({
 
 export const metadata: Metadata = {
   title: "Todo Planner",
-  description: "Plan today&apos;s jobs — for gardeners working across multiple properties",
+  description: "Plan today&apos;s jobs — for workers working across multiple properties",
 };
 
 export default function RootLayout({

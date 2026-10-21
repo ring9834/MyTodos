@@ -18,7 +18,7 @@
 |---|---|---|
 | **Q3** Performance | A user with 1,000+ items lists them, filtered by state, one page at a time: **p95 < 200 ms** (local environment) | H/M |
 | **Q7** Scalability | 10× request volume is handled by adding API instances, while still meeting Q3 | H/L |
-| **FR-7** | Change an item's state quickly from the list (the gardener's most frequent action) | Must |
+| **FR-7** | Change an item's state quickly from the list (the worker's most frequent action) | Must |
 | **FR-10 / FR-11** | Maps: pick a location; view a day's items | Should / Could |
 | **Q5** Modifiability | Performance measures must not make the code hard to change live | M/L |
 | **NFR-8** Cost | Runs within free-trial credit, which means small, possibly burstable, compute and database tiers | Should |
@@ -194,7 +194,7 @@ CQRS is a spectrum, not a single choice:
 - **Modifiability and cost.** More moving parts to explain and change live (Q5), and more infrastructure on a trial budget (NFR-8).
 
 **What would bring it back:**
-- Cross-user reporting or analytics (e.g. an operations dashboard over all gardeners' jobs), which needs aggregated read shapes the write model doesn't have.
+- Cross-user reporting or analytics (e.g. an operations dashboard over all workers' jobs), which needs aggregated read shapes the write model doesn't have.
 - Location queries at scale (e.g. "jobs near me" or route ordering, FR-16) that benefit from a spatially indexed or denormalised projection.
 - Measured read load that a correctly indexed primary cannot serve, and that a read replica (level 3) also cannot serve.
 
