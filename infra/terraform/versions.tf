@@ -14,10 +14,10 @@ terraform {
   # only the Terraform state file, are shared across all environments, and must never be
   # touched by `terraform destroy` run against this config.
   backend "azurerm" {
-    resource_group_name  = "rush-todo-tfstate-rg"
+    resource_group_name  = "my-todo-tfstate-rg"
     storage_account_name = "rushtodotfstate8791"
     container_name       = "tfstate"
-    key                  = "rush-todo.tfstate" # per-environment key if you add more later
+    key                  = "my-todo.tfstate" # per-environment key if you add more later
     # Without this, the backend authenticates to the state BLOB using the storage
     # account's access key (fetched via listKeys — a separate control-plane permission
     # requiring broad, unscoped account access), not the AAD/OIDC token already used for

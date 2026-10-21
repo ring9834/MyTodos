@@ -1,4 +1,4 @@
-# Detailed Design: Location-aware Todo App (rush-todo)
+# Detailed Design: Location-aware Todo App (my-todo)
 
 | | |
 |---|---|

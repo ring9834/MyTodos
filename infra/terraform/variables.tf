@@ -1,6 +1,6 @@
 variable "project" {
   type    = string
-  default = "rush-todo"
+  default = "my-todo"
 }
 
 variable "location" {

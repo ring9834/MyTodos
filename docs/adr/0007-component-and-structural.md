@@ -240,7 +240,7 @@ This is unchanged from the previous version.
 This matches the existing repository, including `Todo.slnx`, `Directory.Build.props` and the `Dockerfile` under `api/`.
 
 ```
-rush-todo/
+my-todo/
 ├── .github/                         # CI/CD workflows (Deployment ADR)
 ├── api/
 │   ├── Directory.Build.props        # shared settings: nullable, warnings as errors, analysers, LangVersion

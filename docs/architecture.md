@@ -1,4 +1,4 @@
-# Architecture: Location-aware Todo App (rush-todo)
+# Architecture: Location-aware Todo App (my-todo)
 
 | | |
 |---|---|
