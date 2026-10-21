@@ -1,3 +1,7 @@
+<p align="center">
+  <img width="544" height="400" alt="todo_app_architecture_overview" src="https://github.com/user-attachments/assets/bdabab51-5801-4b42-9e02-79ae5745f795" />
+</p>
+
 # Architecture Decision Records: index and decision map
 
 These are the project's Architecture Decision Records (ADRs). Each ADR records one significant decision: its context, the options considered, the decision, and its consequences. The decisions are organised into nine **decision areas**.
