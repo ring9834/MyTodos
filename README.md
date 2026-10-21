@@ -8,13 +8,12 @@ It's built as a **thin, production-minded vertical slice**:
 - managed PostgreSQL
 - AKS, provisioned with Terraform and deployed by Helm from GitHub Actions
 
-![CI](https://github.com/ring9834/TodoManage/actions/workflows/ci.yml/badge.svg)
-
 ---
 
 ## Architecture
-
-![Architecture: browser → NGINX Ingress on AKS → Next.js web and ASP.NET Core API → PostgreSQL; migration job as a pre-upgrade hook; GitHub Actions, container registry, Key Vault and Azure Monitor around the cluster](docs/images/architecture.png)
+<p align="center">
+<img width="1360" height="1000" alt="todo_app_architecture_overview_workers" src="https://github.com/user-attachments/assets/362bed70-eb35-4c3b-ba46-1e9d58b97368" />
+</p>
 
 **Blue** boxes are the application workloads running in the cluster. **Beige** boxes are platform and external services. Solid arrows show the request path; dashed arrows show supporting flows (images, deployments, secrets, telemetry).
 
@@ -37,7 +36,9 @@ Full detail: [`docs/architecture.md`](docs/architecture.md) · decisions: [`docs
 
 ## CI/CD
 
-![GitHub Actions run: API and Web jobs, changes and helm-check feed build-and-push, then deploy-dev; terraform runs only when infra changes](docs/images/ci-pipeline.png)
+<p align="center">
+<img width="1280" height="700" alt="680750218-af15369d-c947-481e-bcae-73810e6bfe3f" src="https://github.com/user-attachments/assets/e69b143c-e46c-4fc3-8b19-8794ac3b44c1" />
+</p>
 
 One workflow (`.github/workflows/ci.yml`) runs on every push:
 
