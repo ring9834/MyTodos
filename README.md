@@ -12,7 +12,7 @@ It's built as a **thin, production-minded vertical slice**:
 
 ## Architecture
 <p align="center">
-<img width="1360" height="1000" alt="todo_app_architecture_overview_workers" src="https://github.com/user-attachments/assets/362bed70-eb35-4c3b-ba46-1e9d58b97368" />
+<img width="680" height="500" alt="todo_app_architecture_overview_workers" src="https://github.com/user-attachments/assets/362bed70-eb35-4c3b-ba46-1e9d58b97368" />
 </p>
 
 **Blue** boxes are the application workloads running in the cluster. **Beige** boxes are platform and external services. Solid arrows show the request path; dashed arrows show supporting flows (images, deployments, secrets, telemetry).
