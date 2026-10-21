@@ -5,7 +5,7 @@ These are the project's Architecture Decision Records (ADRs). Each ADR records o
 ## Conventions
 
 - **Numbers are chronological and never reused.** A number records *when* a decision was made, and the decision area is metadata. If a decision changes, a new ADR supersedes the old one, and the old one is kept.
-- **Status values:** Proposed → Accepted → (Superseded by ADR-nnnn | Deprecated).
+- **Status values:** Proposed -> Accepted -> (Superseded by ADR-nnnn | Deprecated).
 - **Drivers vs decision areas.** Quality attributes, functional requirements and constraints (`docs/requirements.md`) are the *drivers*. The eight areas below are where decisions are *made* in response to them. The Quality Attributes area chooses the **tactics** for each attribute; the other areas choose the **mechanisms** that implement them. Each ADR lists the constraints it places on other areas.
 - **Method.** Attribute-Driven Design (ADD) chooses what to decide and in which order (highest-priority drivers first). ATAM concepts are used to analyse each decision: sensitivity points, trade-offs, risks and non-risks.
 
@@ -14,12 +14,12 @@ These are the project's Architecture Decision Records (ADRs). Each ADR records o
 | Area | Key questions | Main drivers | ADR | Status |
 |---|---|---|---|---|
 | **1. Quality attributes** | | | | |
-| → Security | How do users sign in? How is a session carried? How is ownership enforced? Which defence layers apply? | Q1, Q8, NFR-5, NFR-6 | [0001](/docs/adr/0001-security-authentication-and-authorization.md) | Proposed |
-| → Scalability | Scale dimensions (AKF cube); horizontal vs vertical; autoscaling; API style; messaging; monolith vs microservices; database limits | Q7, Q3, Q4 | [0004](/docs/adr/0004-scalability.md) | Proposed |
-| → Performance | Rendering pattern; client state; caching layers; concurrency; paging, indexing, query shape; cloud placement | Q3, Q7, FR-7 | [0003](/docs/adr/0003-performance.md) | Proposed |
-| → Availability | Replicas, probes, rolling updates, disruption budgets, rollback | Q4, NFR-6 | Covered by [0004](/docs/adr/0004-scalability.md) and [0010](/docs/adr/0010-deployment-and-operations.md) | Proposed (no separate ADR) |
-| → Data integrity | Concurrency control; where state rules are enforced | Q2, Q6, BR-1 to BR-6 | Covered by [0005](/docs/adr/0005-testability-and-maintainability.md) §3.6, [0006](/docs/adr/0006-data-architecture.md), [0009](/docs/adr/0009-communication-and-interaction.md) §3.5 | Proposed (no separate ADR) |
-| → Testability and maintainability | SOLID; code organisation; DI; test seams; mocking policy; test strategy; designing for change (adding a status) | NFR-1, NFR-2, Q5, Q2 | [0005](/docs/adr/0005-testability-and-maintainability.md) | Proposed (§3.2 superseded by 0007; time seam and front-end MSW superseded by [0011](/docs/adr/0011-testability-strategy-and-testing-tooling.md)) |
+| ☆ Security | How do users sign in? How is a session carried? How is ownership enforced? Which defence layers apply? | Q1, Q8, NFR-5, NFR-6 | [0001](/docs/adr/0001-security-authentication-and-authorization.md) | Proposed |
+| ☆ Scalability | Scale dimensions (AKF cube); horizontal vs vertical; autoscaling; API style; messaging; monolith vs microservices; database limits | Q7, Q3, Q4 | [0004](/docs/adr/0004-scalability.md) | Proposed |
+| ☆ Performance | Rendering pattern; client state; caching layers; concurrency; paging, indexing, query shape; cloud placement | Q3, Q7, FR-7 | [0003](/docs/adr/0003-performance.md) | Proposed |
+| ☆ Availability | Replicas, probes, rolling updates, disruption budgets, rollback | Q4, NFR-6 | Covered by [0004](/docs/adr/0004-scalability.md) and [0010](/docs/adr/0010-deployment-and-operations.md) | Proposed (no separate ADR) |
+| ☆ Data integrity | Concurrency control; where state rules are enforced | Q2, Q6, BR-1 to BR-6 | Covered by [0005](/docs/adr/0005-testability-and-maintainability.md) §3.6, [0006](/docs/adr/0006-data-architecture.md), [0009](/docs/adr/0009-communication-and-interaction.md) §3.5 | Proposed (no separate ADR) |
+| ☆ Testability and maintainability | SOLID; code organisation; DI; test seams; mocking policy; test strategy; designing for change (adding a status) | NFR-1, NFR-2, Q5, Q2 | [0005](/docs/adr/0005-testability-and-maintainability.md) | Proposed (§3.2 superseded by 0007; time seam and front-end MSW superseded by [0011](/docs/adr/0011-testability-strategy-and-testing-tooling.md)) |
 | **2. Data architecture** | Data access (EF Core vs Dapper); code-first vs database-first; running and evolving migrations; physical model; integrity; concurrency; roles; seeding; lifecycle and personal data | BR-1 to BR-6, Q1, Q3, Q4, Q5, Q6 | [0006](/docs/adr/0006-data-architecture.md) | Proposed |
 | **3. Deployment & operations** | Hosting (AKS vs ACA/ACI/App Service); edge (NGINX Ingress vs Gateway API vs App Gateway vs APIM); TLS; CI/CD (GitHub Actions vs Azure Pipelines); pipelines; images; Helm; Terraform; secrets delivery; environments; release strategy; operations | C-4 to C-7, Q4, NFR-4, NFR-5, NFR-10 | [0010](/docs/adr/0010-deployment-and-operations.md) | Proposed |
 | **4. Component & structural** | Containers; Clean Architecture projects (Api / Application / Domain / Infrastructure); modules as feature folders per layer; `IAppDbContext`; plain handlers; controller-based RESTful API; rich domain; front-end feature folders | Q5, Q2, P-3, NFR-1 | [0007](/docs/adr/0007-component-and-structural.md) | Proposed (supersedes 0005 §3.2) |
