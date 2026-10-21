@@ -69,3 +69,5 @@ The whole stack in one place, with the ADR that chose each technology.
 | AKS (Cilium network policy, workload identity); NGINX Ingress (`nginx.ingress.kubernetes.io`, AKS application routing add-on); cert-manager + Let's Encrypt; GitHub Actions (OIDC); ACR; Key Vault (pipeline secrets); two Helm charts | Constrained / open choices | [0010](/docs/adr/0010-deployment-and-operations.md) |
 | EF Core + Npgsql; code-first migrations run as a migration bundle; snake_case naming convention | Open choice | [0006](/docs/adr/0006-data-architecture.md) |
 | Built-in .NET logging (JSON console); OpenTelemetry (OTLP / Azure Monitor, export off by default); Aspire dashboard (local); ASP.NET Core built-in ProblemDetails (RFC 9457) + `IExceptionHandler` (`TodoExceptionHandler`); `Microsoft.FeatureManagement` (when needed) | Open choice | [0008](/docs/adr/0008-cross-cutting-concerns.md) |
+<p align="center">
+<img width="510" height="280" alt="Cheerful moment!_CI CD completely successful!" src="https://github.com/user-attachments/assets/af15369d-c947-481e-bcae-73810e6bfe3f" /></p>
