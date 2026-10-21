@@ -1,73 +1,160 @@
-<p align="center">
-  <img width="544" height="400" alt="todo_app_architecture_overview" src="https://github.com/user-attachments/assets/bdabab51-5801-4b42-9e02-79ae5745f795" />
-</p>
+# Todo: a location-aware job planner
 
-# Architecture Decision Records: index and decision map
+An API-driven web app for workers to record jobs at customer locations and plan each day's work. Each job (a *todo*) has a title, a state (`todo` → `scheduled` → `done`) and a location (an address, plus an optional map point).
 
-These are the project's Architecture Decision Records (ADRs). Each ADR records one significant decision: its context, the options considered, the decision, and its consequences. The decisions are organised into nine **decision areas**.
+It's built as a **thin, production-minded vertical slice**:
+- a Next.js front end
+- a .NET API in Clean Architecture layers
+- managed PostgreSQL
+- AKS, provisioned with Terraform and deployed by Helm from GitHub Actions
 
-## Conventions
+![CI](https://github.com/ring9834/TodoManage/actions/workflows/ci.yml/badge.svg)
 
-- **Numbers are chronological and never reused.** A number records *when* a decision was made, and the decision area is metadata. If a decision changes, a new ADR supersedes the old one, and the old one is kept.
-- **Status values:** Proposed -> Accepted -> (Superseded by ADR-nnnn | Deprecated).
-- **Drivers vs decision areas.** Quality attributes, functional requirements and constraints (`docs/requirements.md`) are the *drivers*. The eight areas below are where decisions are *made* in response to them. The Quality Attributes area chooses the **tactics** for each attribute; the other areas choose the **mechanisms** that implement them. Each ADR lists the constraints it places on other areas.
-- **Method.** Attribute-Driven Design (ADD) chooses what to decide and in which order (highest-priority drivers first). ATAM concepts are used to analyse each decision: sensitivity points, trade-offs, risks and non-risks.
+---
 
-## Decision map
+## Architecture
 
-| Area | Key questions | Main drivers | ADR | Status |
-|---|---|---|---|---|
-| **1. Quality attributes** | | | | |
-| ☆ Security | How do users sign in? How is a session carried? How is ownership enforced? Which defence layers apply? | Q1, Q8, NFR-5, NFR-6 | [0001](/docs/adr/0001-security-authentication-and-authorization.md) | Proposed |
-| ☆ Scalability | Scale dimensions (AKF cube); horizontal vs vertical; autoscaling; API style; messaging; monolith vs microservices; database limits | Q7, Q3, Q4 | [0004](/docs/adr/0004-scalability.md) | Proposed |
-| ☆ Performance | Rendering pattern; client state; caching layers; concurrency; paging, indexing, query shape; cloud placement | Q3, Q7, FR-7 | [0003](/docs/adr/0003-performance.md) | Proposed |
-| ☆ Availability | Replicas, probes, rolling updates, disruption budgets, rollback | Q4, NFR-6 | Covered by [0004](/docs/adr/0004-scalability.md) and [0010](/docs/adr/0010-deployment-and-operations.md) | Proposed (no separate ADR) |
-| ☆ Data integrity | Concurrency control; where state rules are enforced | Q2, Q6, BR-1 to BR-6 | Covered by [0005](/docs/adr/0005-testability-and-maintainability.md) §3.6, [0006](/docs/adr/0006-data-architecture.md), [0009](/docs/adr/0009-communication-and-interaction.md) §3.5 | Proposed (no separate ADR) |
-| ☆ Testability and maintainability | SOLID; code organisation; DI; test seams; mocking policy; test strategy; designing for change (adding a status) | NFR-1, NFR-2, Q5, Q2 | [0005](/docs/adr/0005-testability-and-maintainability.md) | Proposed (§3.2 superseded by 0007; time seam and front-end MSW superseded by [0011](/docs/adr/0011-testability-strategy-and-testing-tooling.md)) |
-| **2. Data architecture** | Data access (EF Core vs Dapper); code-first vs database-first; running and evolving migrations; physical model; integrity; concurrency; roles; seeding; lifecycle and personal data | BR-1 to BR-6, Q1, Q3, Q4, Q5, Q6 | [0006](/docs/adr/0006-data-architecture.md) | Proposed |
-| **3. Deployment & operations** | Hosting (AKS vs ACA/ACI/App Service); edge (NGINX Ingress vs Gateway API vs App Gateway vs APIM); TLS; CI/CD (GitHub Actions vs Azure Pipelines); pipelines; images; Helm; Terraform; secrets delivery; environments; release strategy; operations | C-4 to C-7, Q4, NFR-4, NFR-5, NFR-10 | [0010](/docs/adr/0010-deployment-and-operations.md) | Proposed |
-| **4. Component & structural** | Containers; Clean Architecture projects (Api / Application / Domain / Infrastructure); modules as feature folders per layer; `IAppDbContext`; plain handlers; controller-based RESTful API; rich domain; front-end feature folders | Q5, Q2, P-3, NFR-1 | [0007](/docs/adr/0007-component-and-structural.md) | Proposed (supersedes 0005 §3.2) |
-| **5. Communication & interaction** | Protocols per link; REST level 2; endpoint catalogue and status codes; representation rules; `ETag`/`If-Match`; idempotency and retries; content negotiation; versioning and evolution; OpenAPI contract and drift check | C-3, Q1, Q2, Q4, Q6, NFR-3 | [0009](/docs/adr/0009-communication-and-interaction.md) | Proposed |
-| **6. Cross-cutting concerns** | Observability (logging, correlation, metrics, tracing, alerting); error taxonomy and contract; exception strategy; validation; configuration and secrets; feature flags; health checks | NFR-2, NFR-3, NFR-5, NFR-6, Q3, Q4 | [0008](/docs/adr/0008-cross-cutting-concerns.md) | Proposed |
-| **7. Technology & tooling** | Core stack (frontend, backend, cloud, data store); testing and quality tooling; other tools chosen in their own area's ADR | C-1, C-2, C-4, A0, ADR-0001 §7, NFR-1 | [0002](/docs/adr/0002-technology-stack.md), [0011](/docs/adr/0011-testability-strategy-and-testing-tooling.md) | Proposed |
-| **8. Evolution & extensibility** | The N / N−1 compatibility rule; API versioning (enforced additive now; URL segment later); deprecation; schema and data versioning; token key rotation; configuration and client skew; artifact and platform versioning; extension points; evolution register | Q4, Q5, requirements §10.3 | [0012](/docs/adr/0012-evolution-and-extensibility.md) | Proposed |
+![Architecture: browser → NGINX Ingress on AKS → Next.js web and ASP.NET Core API → PostgreSQL; migration job as a pre-upgrade hook; GitHub Actions, container registry, Key Vault and Azure Monitor around the cluster](docs/images/architecture.png)
 
-## Suggested order for the decisions
+**Blue** boxes are the application workloads running in the cluster. **Beige** boxes are platform and external services. Solid arrows show the request path; dashed arrows show supporting flows (images, deployments, secrets, telemetry).
 
-ADD takes the highest-priority drivers first, then the decisions that everything else depends on:
+| Concern | Choice |
+|---|---|
+| Front end | Next.js (React, TypeScript): a static shell with client-side data via TanStack Query; no Server Actions |
+| API | ASP.NET Core controllers; Clean Architecture (`Todo.Api` / `Application` / `Domain` / `Infrastructure`) |
+| Data | PostgreSQL (Azure Flexible Server), EF Core code-first, `xmin` optimistic concurrency |
+| Security | Password sign-in → JWT in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie; deny by default; owner filter on every query (another user's item → 404) |
+| Errors | Built-in ProblemDetails (RFC 9457) via a single `TodoExceptionHandler`, with a stable `code` |
+| Observability | OpenTelemetry instrumentation → Azure Monitor; the only `ILogger` call is in `TodoExceptionHandler` |
+| Hosting | AKS, NGINX Ingress (TLS, `/` → web, `/api` → API), migrations as a Helm pre-upgrade hook |
+| Delivery | GitHub Actions with Azure OIDC (no stored cloud secrets); SHA-tagged images; rollback on a failed release |
 
-1. **Technology & tooling:** core stack, ADR-0002 (done).
-2. **Component & structural:** containers and internal structure ([ADR-0007](/docs/adr/0007-component-and-structural.md), done).
-3. **Communication & interaction:** the API contract ([ADR-0009](/docs/adr/0009-communication-and-interaction.md), done).
-4. **Data architecture** ([ADR-0006](/docs/adr/0006-data-architecture.md), done), together with **data integrity** (Q2, Q6: covered by ADR-0005 §3.6, ADR-0006 and ADR-0009 §3.5) and **performance** (Q3, [ADR-0003](/docs/adr/0003-performance.md), done).
-5. **Deployment & operations** ([ADR-0010](/docs/adr/0010-deployment-and-operations.md), done), together with **availability** (Q4: covered by ADR-0004 and ADR-0010) and **scalability** (Q7, [ADR-0004](/docs/adr/0004-scalability.md), done).
-6. **Cross-cutting concerns** ([ADR-0008](/docs/adr/0008-cross-cutting-concerns.md), done), **testability** and **maintainability** ([ADR-0005](/docs/adr/0005-testability-and-maintainability.md) and [ADR-0011](0011-testability-strategy-and-testing-tooling.md), done).
-7. **Evolution & extensibility:** versioning rules, extension points and the evolution register ([ADR-0012](/docs/adr/0012-evolution-and-extensibility.md), done).
+**Guiding principle:** the API is the only place rules and security are enforced, and every abstraction must solve a problem that exists here. So there are no microservices, caches, CQRS read models or repository layer. Each deliberate deferral is recorded with a trigger.
 
-Once every area has been decided, the ATAM analysis from each ADR is combined into `docs/architecture.md`. It also covers the risks that span areas: risk themes that appear in several ADRs.
+Full detail: [`docs/architecture.md`](docs/architecture.md) · decisions: [`docs/adr/`](docs/adr/README.md)
 
-## Technology summary
+---
 
-The whole stack in one place, with the ADR that chose each technology.
+## CI/CD
 
-| Technology | Kind | Chosen in |
-|---|---|---|
-| Terraform, Kubernetes, Helm | Mandated by the brief (C-5 to C-7) | — |
-| Next.js (React), used with guardrails | Open choice within C-1 | [0002](/docs/adr/0002-technology-stack.md) |
-| .NET / ASP.NET Core | Constrained choice (C-2) | [0002](/docs/adr/0002-technology-stack.md) |
-| Azure (AKS) | Constrained choice (C-4) | [0002](/docs/adr/0002-technology-stack.md) |
-| PostgreSQL (managed) | Open choice | [0002](/docs/adr/0002-technology-stack.md) |
-| TanStack Query (server state); URL parameters for filters | Open choice | [0003](/docs/adr/0003-performance.md) |
-| Bundle-size budget (size-limit); load testing (k6) and Lighthouse CI **deferred** | Open choice | [0003](/docs/adr/0003-performance.md), [0011](/docs/adr/0011-testability-strategy-and-testing-tooling.md) |
-| xUnit v3, Shouldly, NSubstitute (rarely), `IClock` + `FakeClock`, `FakeLogger`, `WebApplicationFactory`, Testcontainers (one container per run), Respawn, ArchUnitNET; Vitest (jsdom), Testing Library, stubbed `fetch` (`vi.stubGlobal`; **MSW deferred**), vitest-axe; **no browser automation or load-test automation for now** (Playwright, k6 deferred); size-limit; gitleaks, Trivy, Dependabot, CodeQL, tflint, kubeconform | Open choice | [0011](/docs/adr/0011-testability-strategy-and-testing-tooling.md) |
-| `oasdiff` (OpenAPI breaking-change check); Asp.Versioning (when a v2 is needed); SemVer release tags + Conventional Commits | Open choice | [0012](/docs/adr/0012-evolution-and-extensibility.md) |
-| Built-in .NET DI container | Open choice | [0005](/docs/adr/0005-testability-and-maintainability.md) |
-| ASP.NET Core MVC controllers (`[ApiController]`) | Open choice | [0007](/docs/adr/0007-component-and-structural.md) |
-| REST over HTTP/JSON (API style) | Open choice | [0004](/docs/adr/0004-scalability.md) |
-| Kubernetes Horizontal Pod Autoscaler | Open choice (within mandated Kubernetes) | [0004](/docs/adr/0004-scalability.md) |
-| HTTPS/HTTP/2 at the edge; `ETag`/`If-Match`; ASP.NET Core OpenAPI (build-time) + `openapi-typescript` | Open choice | [0009](/docs/adr/0009-communication-and-interaction.md) |
-| AKS (Cilium network policy, workload identity); NGINX Ingress (`nginx.ingress.kubernetes.io`, AKS application routing add-on); cert-manager + Let's Encrypt; GitHub Actions (OIDC); ACR; Key Vault (pipeline secrets); two Helm charts | Constrained / open choices | [0010](/docs/adr/0010-deployment-and-operations.md) |
-| EF Core + Npgsql; code-first migrations run as a migration bundle; snake_case naming convention | Open choice | [0006](/docs/adr/0006-data-architecture.md) |
-| Built-in .NET logging (JSON console); OpenTelemetry (OTLP / Azure Monitor, export off by default); Aspire dashboard (local); ASP.NET Core built-in ProblemDetails (RFC 9457) + `IExceptionHandler` (`TodoExceptionHandler`); `Microsoft.FeatureManagement` (when needed) | Open choice | [0008](/docs/adr/0008-cross-cutting-concerns.md) |
-<p align="center">
-<img width="1020" height="560" alt="Cheerful moment!_CI CD completely successful!" src="https://github.com/user-attachments/assets/af15369d-c947-481e-bcae-73810e6bfe3f" /></p>
+![GitHub Actions run: API and Web jobs, changes and helm-check feed build-and-push, then deploy-dev; terraform runs only when infra changes](docs/images/ci-pipeline.png)
+
+One workflow (`.github/workflows/ci.yml`) runs on every push:
+
+| Job | What it does |
+|---|---|
+| **API (build + test)** | Builds the .NET solution; runs unit tests and integration tests against real PostgreSQL (Testcontainers) |
+| **Web (lint + build)** | Lints and builds the Next.js app; runs component tests |
+| **changes** | Detects which areas changed, so infrastructure jobs run only when needed |
+| **helm-check** | Lints and renders the Helm chart |
+| **terraform** | Plans and applies infrastructure; **skipped** when `infra/` hasn't changed |
+| **build-and-push** | Builds the API and web images, tagged with the git SHA, and pushes them to ACR |
+| **deploy-dev** | Signs in to Azure with OIDC, runs `helm upgrade` (migration hook first, **rollback on failure**), then smoke-tests `/health/ready` |
+
+A typical run takes about 4 minutes from push to a deployed `deploy-dev`.
+
+---
+
+## Repository layout
+
+```
+.
+├── .github/workflows/      CI/CD (ci.yml)
+├── api/
+│   ├── src/
+│   │   ├── Todo.Api/             host: controllers, TodoExceptionHandler, auth, health
+│   │   ├── Todo.Application/     use cases (commands/queries + handlers), DTOs, interfaces
+│   │   ├── Todo.Domain/          entities, TodoState, transition table, domain exceptions
+│   │   └── Todo.Infrastructure/  EF Core, migrations, JWT issuing, password hashing, seeding
+│   ├── tests/                    unit tests (no Docker) + integration tests (Testcontainers)
+│   ├── Dockerfile
+│   └── Todo.slnx
+├── web/                    Next.js app: src/app (routes), src/components (feature folders), src/lib
+├── deploy/helm/            Helm chart (todo-planner)
+├── infra/                  Terraform (AKS, ACR, PostgreSQL, Key Vault, monitoring)
+└── docs/                   requirements, architecture, design, ADRs, readiness, AI usage log
+```
+
+---
+
+## Getting started
+
+### Prerequisites
+- .NET SDK (current LTS), Node.js (LTS), Docker
+- For cloud work: Azure CLI, Terraform, kubectl, Helm
+
+### Run locally
+
+```bash
+docker compose up          # API, web, PostgreSQL, telemetry dashboard
+```
+
+Then open the web app, sign in with a seeded development user, and create, schedule and complete a job.
+
+> Adjust the commands, ports and seeded users here to match `docker-compose.yml` and the seed configuration.
+
+### Run the tests
+
+```bash
+# API: unit tests (no Docker needed) and integration tests (Docker required)
+dotnet test api/Todo.slnx
+
+# Web: component tests
+cd web && npm ci && npm test
+```
+
+### Deploy
+
+Deployment is automated: push to `main`, and `ci.yml` builds, pushes and deploys to `deploy-dev`. Infrastructure changes under `infra/` trigger the `terraform` job. Runtime secrets come from Key Vault via the pipeline, never from git.
+
+---
+
+## API at a glance
+
+| Method and path | Purpose |
+|---|---|
+| `POST /api/auth/login` · `POST /api/auth/logout` · `GET /api/auth/me` | Session |
+| `GET /api/todos?state=&date=&page=&pageSize=` | List my jobs (paged) |
+| `GET /api/todos/{id}` | Get one |
+| `POST /api/todos` | Create |
+| `PUT /api/todos/{id}` | Update details (`If-Match` required) |
+| `PUT /api/todos/{id}/state` | Change state (`If-Match` required) |
+| `DELETE /api/todos/{id}` | Delete |
+| `GET /health/live` · `GET /health/ready` | Probes |
+
+Errors are `application/problem+json`, with a machine-readable `code`, e.g. `todo.not_found` (404), `todo.invalid_transition` (409), `todo.version_conflict` (409), `validation_failed` (400). The contract is in the repository's OpenAPI document.
+
+---
+
+## Testing approach
+
+- **Domain:** unit tests for the state machine and business rules, with no infrastructure.
+- **API:** integration tests through the real HTTP pipeline against **real PostgreSQL** (Testcontainers), signing in through the **real login endpoint**, with no auth bypass. These cover isolation between users, concurrency (`xmin`) and the error contract.
+- **Web:** component tests with Vitest and Testing Library, stubbing `fetch`.
+- **Deliberately deferred,** each with a trigger: MSW, browser end-to-end tests (Playwright) and load tests (k6). Full-stack journeys are currently checked by hand after deploys.
+
+---
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [`docs/requirements.md`](docs/requirements.md) | Constraints, assumptions, requirements, quality scenarios, scope |
+| [`docs/architecture.md`](docs/architecture.md) | Views, how each quality is achieved, ATAM risk themes |
+| [`docs/design.md`](docs/design.md) | Domain rules, API contract, schema, security and deployment details |
+| [`docs/adr/`](docs/adr/README.md) | Architecture Decision Records and the decision map |
+| [`docs/production-readiness.md`](docs/production-readiness.md) | Readiness checklist with evidence, gaps and next steps |
+| [`docs/ai-usage.md`](docs/ai-usage.md) | How AI was used, what was changed or rejected, and how it was verified |
+
+---
+
+## Known limitations
+
+This is sized for a free-trial subscription. Notable gaps, each tracked in [`docs/production-readiness.md`](docs/production-readiness.md):
+- a single small node and a single database primary
+- no staging environment
+- app-managed passwords (no MFA)
+- alerts defined but not yet enabled
+- automated end-to-end and load tests deferred
+
+The first steps toward real customers would be federated sign-in, private networking with secrets mounted from Key Vault, and enabling the alerts.
