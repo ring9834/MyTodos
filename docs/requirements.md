@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Baselined for MVP; assumptions pending product-owner confirmation |
 | **Last updated** | 2026-09-29 |
-| **Sources** | `1. Business requirements.docx`, `2. Interview notes.docx` |
+| **Sources** | `1. Business requirements.docx` |
 
 > **Scope of this document:** *what* the system must do and *why*. *How* it is built (technology selection, API contract, physical data model, authentication mechanism, deployment design) is covered in the design documents under `docs/design/` and `docs/adr/`.
 
