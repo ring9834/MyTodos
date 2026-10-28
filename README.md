@@ -22,10 +22,10 @@ It's built as a **thin, production-minded vertical slice**:
 | Front end | Next.js (React, TypeScript): a static shell with client-side data via TanStack Query; no Server Actions |
 | API | ASP.NET Core controllers; Clean Architecture (`Todo.Api` / `Application` / `Domain` / `Infrastructure`) |
 | Data | PostgreSQL (Azure Flexible Server), EF Core code-first, `xmin` optimistic concurrency |
-| Security | Password sign-in → JWT in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie; deny by default; owner filter on every query (another user's item → 404) |
+| Security | Password sign-in -> JWT in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie; deny by default; owner filter on every query (another user's item -> 404) |
 | Errors | Built-in ProblemDetails (RFC 9457) via a single `TodoExceptionHandler`, with a stable `code` |
-| Observability | OpenTelemetry instrumentation → Azure Monitor; the only `ILogger` call is in `TodoExceptionHandler` |
-| Hosting | AKS, NGINX Ingress (TLS, `/` → web, `/api` → API), migrations as a Helm pre-upgrade hook |
+| Observability | OpenTelemetry instrumentation -> Azure Monitor; the only `ILogger` call is in `TodoExceptionHandler` |
+| Hosting | AKS, NGINX Ingress (TLS, `/` -> web, `/api` -> API), migrations as a Helm pre-upgrade hook |
 | Delivery | GitHub Actions with Azure OIDC (no stored cloud secrets); SHA-tagged images; rollback on a failed release |
 
 **Guiding principle:** the API is the only place rules and security are enforced, and every abstraction must solve a problem that exists here. So there are no microservices, caches, CQRS read models or repository layer. Each deliberate deferral is recorded with a trigger.
