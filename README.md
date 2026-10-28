@@ -8,6 +8,7 @@ It's built as a **thin, production-minded vertical slice**:
 - managed PostgreSQL
 - AKS, provisioned with Terraform and deployed by Helm from GitHub Actions
 
+![CI Status](https://github.com/<OWNER>/<REPOSITORY>/actions/workflows/<WORKFLOW_FILE>/badge.svg)
 ---
 
 ## Architecture
