@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Proposed |
 | **Date** | 2026-09-29 |
-| **Decision area** | Quality Attributes → **Scalability** |
+| **Decision area** | Quality Attributes -> **Scalability** |
 | **Method** | Attribute-Driven Design; the AKF Scale Cube to structure the options; analysed with ATAM concepts |
 | **Related** | `docs/requirements.md`: Q7, Q3, Q4, Q5, NFR-8, P-5, C-3, C-6; ADR-0001 (stateless JWT, S1, S6); ADR-0002 (.NET, Next.js, Azure, PostgreSQL); ADR-0003 (async I/O, one API service, no server caches, connection pooling rule) |
 

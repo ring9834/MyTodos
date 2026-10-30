@@ -11,7 +11,7 @@ using Todo.Domain.Exceptions;
 
 namespace Todo.UnitTests.Api;
 
-// ADR-0008 §6: "Unit test over the exception → (status, code) table".
+// ADR-0008 §6: "Unit test over the exception -> (status, code) table".
 public class TodoExceptionHandlerTests
 {
     public static TheoryData<Exception, int, string, LogLevel> Mapping => new()

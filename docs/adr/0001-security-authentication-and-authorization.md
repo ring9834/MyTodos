@@ -4,8 +4,8 @@
 |---|---|
 | **Status** | Proposed |
 | **Date** | 2026-09-29 |
-| **Decision area** | Quality Attributes → **Security** (first architectural decision) |
-| **Method** | Attribute-Driven Design (drivers → tactics → instantiation); analysed with ATAM concepts (sensitivity points, trade-offs, risks, non-risks) |
+| **Decision area** | Quality Attributes -> **Security** (first architectural decision) |
+| **Method** | Attribute-Driven Design (drivers -> tactics -> instantiation); analysed with ATAM concepts (sensitivity points, trade-offs, risks, non-risks) |
 | **Related** | `docs/requirements.md`: Q1, Q7, Q8, NFR-5, NFR-6, NFR-10, A4, A5, A6, A10, BR-4, C-1 to C-6 |
 
 > **Scope.** This ADR decides security **tactics and patterns** in technology-neutral terms. The specific frameworks, libraries, cloud services and routing mechanisms are chosen under *Technology & Tooling*, *Communication & Interaction* and *Deployment & Operations*. Appendix A shows how the tactics would be realised with the candidate stack; it is **illustrative and conditional** on those later decisions.
@@ -47,13 +47,13 @@ Security reasoning starts from **trust boundaries**: the places where data cross
 
 ```mermaid
 flowchart LR
-    U([Worker's browser<br/>React UI]) -- "TB1: internet → edge<br/>TLS, rate limiting" --> E[Edge<br/>single public entry point]
+    U([Worker's browser<br/>React UI]) -- "TB1: internet -> edge<br/>TLS, rate limiting" --> E[Edge<br/>single public entry point]
     subgraph K["Kubernetes cluster (trusted zone)"]
         E -- "/ (UI assets)" --> W[Web tier]
         E -- "/api/*" --> A[API]
     end
-    A -- "TB2: cluster → data store<br/>TLS, credentials, network restriction" --> D[(Data store)]
-    CI([CI/CD pipeline]) -- "TB3: pipeline → cloud<br/>workload identity federation" --> K
+    A -- "TB2: cluster -> data store<br/>TLS, credentials, network restriction" --> D[(Data store)]
+    CI([CI/CD pipeline]) -- "TB3: pipeline -> cloud<br/>workload identity federation" --> K
     O([Operator]) -- "TB4: admin access<br/>cloud RBAC" --> K
 ```
 
@@ -119,14 +119,14 @@ sequenceDiagram
     participant A as API
     participant D as Data store
     B->>E: POST /api/auth/login {username, password}
-    E->>A: route /api/* → API
+    E->>A: route /api/* -> API
     A->>A: rate limit check (per IP)
     A->>D: find user by username
     A->>A: verify hash (a dummy hash if the user is unknown, to equalise timing)
     A-->>B: 200 + Set-Cookie: session=<JWT>; HttpOnly; Secure; SameSite=Strict; Path=/
     B->>E: GET /api/todos (cookie sent automatically)
     E->>A: route (cookie forwarded)
-    A->>A: validate JWT → user id from `sub` claim
+    A->>A: validate JWT -> user id from `sub` claim
     A->>D: query items WHERE owner = sub
     A-->>B: 200 [my items only]
 ```
@@ -289,11 +289,11 @@ This ADR decides tactics. The areas below choose the mechanisms, and must honour
 
 | Check | Type | Driver |
 |---|---|---|
-| No credentials, expired token, tampered signature, wrong issuer or audience, or `alg: none` → 401 | API integration tests | Q8 |
-| `bob` gets, updates or deletes `alice`'s item → 404, and `alice`'s item is unchanged; `bob`'s list excludes it | API integration tests | Q1 |
-| Creating an item with an extra `ownerId` field in the body → the owner is still the caller | API integration test | N4 |
+| No credentials, expired token, tampered signature, wrong issuer or audience, or `alg: none` -> 401 | API integration tests | Q8 |
+| `bob` gets, updates or deletes `alice`'s item -> 404, and `alice`'s item is unchanged; `bob`'s list excludes it | API integration tests | Q1 |
+| Creating an item with an extra `ownerId` field in the body -> the owner is still the caller | API integration test | N4 |
 | Wrong password and unknown user return the same response | API integration test | N5 |
-| Exceeding the sign-in rate limit → 429 | API integration test | Layer 4 |
+| Exceeding the sign-in rate limit -> 429 | API integration test | Layer 4 |
 | The response cookie has `HttpOnly`, `Secure` and `SameSite=Strict` set | API integration test | T3 |
 | Health endpoints respond without authentication | API integration test | S7 |
 | No secrets in the repository | Pipeline secret scan and review | NFR-5 |

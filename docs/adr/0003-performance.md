@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Proposed |
 | **Date** | 2026-09-29 |
-| **Decision area** | Quality Attributes → **Performance** |
+| **Decision area** | Quality Attributes -> **Performance** |
 | **Method** | Attribute-Driven Design, using the SEI performance tactics (control resource demand, manage resources); analysed with ATAM concepts |
 | **Related** | `docs/requirements.md`: Q3, Q7, Q5, Q6, FR-7, FR-9, FR-10, NFR-8; ADR-0001 (S4, same-origin); ADR-0002 (Next.js guardrails, PostgreSQL, Azure) |
 
@@ -80,7 +80,7 @@ Q3 is the only performance requirement given. The other budgets below are **deri
 |---|---|---|
 | Client-side rendering only (CSR) | An empty page; everything is rendered in the browser | + Simple; − blank page until the JavaScript loads |
 | **Static shell + CSR data (chosen)** | Layout and UI chrome are pre-rendered to HTML at build time and served instantly; data is fetched from the browser and shown with skeletons | ++ Fast first paint; the shell is fully cacheable; one data path through the API; no server-side cookie handling (ADR-0001 S4); matches the ADR-0002 guardrail |
-| Server-side rendering per request (SSR) | Each request renders HTML with data on the server | − The data is per-user, so nothing can be shared or cached. It adds a web → API hop on the server, needs cookie forwarding (ADR-0001 S4), and puts load on the Node.js server. Its main benefit, SEO, is irrelevant behind sign-in |
+| Server-side rendering per request (SSR) | Each request renders HTML with data on the server | − The data is per-user, so nothing can be shared or cached. It adds a web -> API hop on the server, needs cookie forwarding (ADR-0001 S4), and puts load on the Node.js server. Its main benefit, SEO, is irrelevant behind sign-in |
 | Static generation with incremental regeneration (ISR) | Pages are regenerated periodically | ✗ Built for public, shared content; unusable for per-user data |
 | Streaming SSR with React Server Components fetching data | The server streams HTML as data arrives | − Same drawbacks as SSR, plus more complex caching semantics and a second data path to secure. A poor fit for live changes (Q5) |
 | Partial prerendering (a static shell with dynamic holes rendered on the server) | A hybrid | 0 Similar user experience to the chosen option, but it depends on newer, evolving framework features and on server-side data access |
@@ -204,7 +204,7 @@ Even then, the next step would be level 2 or 3, not level 4.
 
 | Tactic | Decision | Why |
 |---|---|---|
-| **Indexes that start with the owner** | ✅ Every list query is served by an index whose first column is the owner, followed by the filter and sort columns (e.g. owner → state → scheduled date). The exact index definitions belong in the Data Architecture ADR | The owner filter (ADR-0001) applies to *every* query, so an index without it is useless. This is the most important database decision for Q3 |
+| **Indexes that start with the owner** | ✅ Every list query is served by an index whose first column is the owner, followed by the filter and sort columns (e.g. owner -> state -> scheduled date). The exact index definitions belong in the Data Architecture ADR | The owner filter (ADR-0001) applies to *every* query, so an index without it is useless. This is the most important database decision for Q3 |
 | **Server-side paging: offset + bounded page size** | ✅ Default 50, maximum 100; stable sort (scheduled date, created date, id) | Simple, works with page numbers and URL state, and is fast at this data size |
 | Keyset (cursor) paging | ❌ Deferred | Better for very deep pages or very large tables; not needed at thousands of rows |
 | **Total count for the pager** | ✅ | Cheap at this size through the owner index. A sensitivity point at large scale (S3) |
@@ -237,7 +237,7 @@ Even then, the next step would be level 2 or 3, not level 4.
 | S1 | **Index design.** Q3 depends almost entirely on list queries being served by an owner-first index | Performance |
 | S2 | **Connection pool size × replicas vs the database connection limit.** Scaling out without resizing pools exhausts connections and causes errors | Performance, Scalability (Q7), Availability |
 | S3 | **Page size and total count.** They bound response size and query cost | Performance |
-| S4 | **Network hop count** (edge → API directly, or via Next.js) | Performance, Scalability of the web tier |
+| S4 | **Network hop count** (edge -> API directly, or via Next.js) | Performance, Scalability of the web tier |
 | S5 | **Client cache `staleTime`.** The balance between fewer requests and fresher data | Performance vs data freshness |
 | S6 | **Burstable CPU credits** on compute and database | Performance consistency, Cost |
 

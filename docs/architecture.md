@@ -22,7 +22,7 @@
 | Front end | Next.js (React), static shell + client-side data fetching, TanStack Query; no Server Actions | [0002](adr/0002-technology-stack.md), [0003](adr/0003-performance.md) |
 | API | ASP.NET Core (.NET LTS), **controller-based REST**, Clean Architecture (Api / Application / Domain / Infrastructure) | [0002](adr/0002-technology-stack.md), [0007](adr/0007-component-and-structural.md), [0009](adr/0009-communication-and-interaction.md) |
 | Data | PostgreSQL (Azure Flexible Server), EF Core code-first, `xmin` optimistic concurrency | [0006](adr/0006-data-architecture.md) |
-| Security | Username + password → **JWT in an `HttpOnly` cookie** (or bearer); deny by default; **owner filter on every query**; defence in depth | [0001](adr/0001-security-authentication-and-authorization.md) |
+| Security | Username + password -> **JWT in an `HttpOnly` cookie** (or bearer); deny by default; **owner filter on every query**; defence in depth | [0001](adr/0001-security-authentication-and-authorization.md) |
 | Errors | Built-in **ProblemDetails** (RFC 9457) via one `TodoExceptionHandler`; stable `code`; no `traceId` | [0008](adr/0008-cross-cutting-concerns.md) |
 | Observability | **OpenTelemetry instrumentation first**; the only `ILogger` call is in `TodoExceptionHandler` | [0008](adr/0008-cross-cutting-concerns.md) |
 | Hosting | AKS (Cilium network policies, workload identity), **NGINX Ingress** (AKS application routing add-on), cert-manager + Let's Encrypt | [0010](adr/0010-deployment-and-operations.md) |
@@ -96,7 +96,7 @@ flowchart LR
 ```
 
 - **The browser sees one origin.** `/api/*` goes straight to the API and everything else to the web tier (ADR-0001 S4, ADR-0003, ADR-0009).
-- **The web tier never calls the API server-side.** All data flows browser → API, so authorization lives in one place (P2).
+- **The web tier never calls the API server-side.** All data flows browser -> API, so authorization lives in one place (P2).
 - The API holds **all business rules and the only authorization logic.** PostgreSQL enforces integrity as a backstop.
 
 ---
@@ -120,7 +120,7 @@ flowchart LR
 flowchart TB
     subgraph Api[Todo.Api — host]
         C[Controllers<br/>TodosController · AuthController]
-        EH[Middleware/TodoExceptionHandler<br/>exception → ProblemDetails · the only ILogger]
+        EH[Middleware/TodoExceptionHandler<br/>exception -> ProblemDetails · the only ILogger]
         CU[CurrentUser : ICurrentUser]
         F[RequireIfMatch filter]
     end
@@ -148,7 +148,7 @@ flowchart TB
 | Rule | Enforced by | ADR |
 |---|---|---|
 | Domain depends on nothing; Application doesn't depend on Infrastructure | Compiler (project references) | 0007 |
-| Controllers are thin (bind → handler → success result), with no Infrastructure types | ArchUnitNET | 0007 |
+| Controllers are thin (bind -> handler -> success result), with no Infrastructure types | ArchUnitNET | 0007 |
 | `Todos` and `Auth` reference each other by id only | ArchUnitNET | 0007 |
 | `ILogger` is used only in `TodoExceptionHandler`; no direct `UtcNow` | ArchUnitNET | 0008, 0011 |
 | No repository, MediatR or AutoMapper; the EF context through `IAppDbContext` | Review; ADR guardrails | 0005, 0007, 0011 |
@@ -163,7 +163,7 @@ flowchart TB
 | `src/app/` | Thin routes: `layout.tsx` (static shell), `login/`, `todos/` | No feature logic |
 | `src/components/todos/`, `src/components/auth/` | **Feature folders:** components, TanStack Query hooks, API calls, form schema, co-located tests | Features don't import from each other |
 | `src/components/ui/` | Generic presentational components | Feature-free |
-| `src/lib/api/` | **Generated OpenAPI types**; one fetch wrapper (same origin, JSON, `If-Match`, ProblemDetails → `ApiError`) | Feature-free |
+| `src/lib/api/` | **Generated OpenAPI types**; one fetch wrapper (same origin, JSON, `If-Match`, ProblemDetails -> `ApiError`) | Feature-free |
 | `src/middleware.ts` | UX redirect to sign-in only | Never authorization |
 
 ### 4.4 Deployment view
@@ -172,7 +172,7 @@ flowchart TB
 flowchart TB
     subgraph GH[GitHub]
         CI[ci.yml: static · unit · integration]
-        DEP[deploy.yml: build → secrets → todo-api → smoke → todo-web → smoke]
+        DEP[deploy.yml: build -> secrets -> todo-api -> smoke -> todo-web -> smoke]
         INF[infra.yml: terraform plan / apply]
         PLT[platform.yml: cert-manager · issuer · certificate · DB roles]
     end
@@ -206,7 +206,7 @@ flowchart TB
 | Environments | Local (Docker Compose), CI (ephemeral), **prod**; staging is one values file away | 0010 |
 | Release strategy | Rolling (`maxUnavailable: 0`), readiness gates, `helm --atomic`, API before web, migration hook first | 0010 |
 | Rollback | `helm rollback` (application); database forward-only | 0006, 0010, 0012 |
-| Secrets | Terraform → Key Vault → pipeline → Kubernetes Secrets (outside Helm history) | 0010 |
+| Secrets | Terraform -> Key Vault -> pipeline -> Kubernetes Secrets (outside Helm history) | 0010 |
 | Infrastructure as code | Terraform for Azure; Helm for everything in the cluster; plan on PR, apply the saved plan | 0010 |
 | Cost control | Trial-sized tiers; budget alert; stop AKS and PostgreSQL between demos | 0008, 0010 |
 
@@ -231,7 +231,7 @@ erDiagram
         date scheduled_for "required when scheduled"
         timestamptz created_at "via IClock"
         timestamptz updated_at
-        xid xmin "concurrency → version / ETag"
+        xid xmin "concurrency -> version / ETag"
     }
 ```
 
@@ -240,7 +240,7 @@ erDiagram
 | Access | EF Core + Npgsql; reads project with `AsNoTracking`; writes go through the entity | 0006 |
 | Isolation | Global owner filter bound to `ICurrentUser`; row-level security deferred | 0001, 0006 |
 | Integrity | Rules in the domain (guard clauses, transition table) **and** in the database (`CHECK`, `NOT NULL`, foreign key) | 0005, 0006 |
-| Concurrency | `xmin` → `version` / `ETag`; `If-Match` required on updates; conflict → 409 | 0006, 0009 |
+| Concurrency | `xmin` -> `version` / `ETag`; `If-Match` required on updates; conflict -> 409 | 0006, 0009 |
 | Schema change | Code-first; generated SQL reviewed; **expand/contract**; forward-only; migration Job | 0006, 0012 |
 | Roles | Admin (break-glass) · migration (DDL) · runtime (DML only) | 0006, 0010 |
 | Personal data | Addresses and coordinates: minimised, TLS in transit, encrypted at rest, never logged | 0006, 0008 |
@@ -260,7 +260,7 @@ sequenceDiagram
     A->>A: rate limit · verify PBKDF2 hash (dummy hash if unknown)
     A-->>B: 200 {id, username} + Set-Cookie (JWT; HttpOnly; Secure; SameSite=Strict)
     B->>A: GET /api/todos?state=scheduled (cookie sent automatically)
-    A->>A: validate JWT (iss, aud, exp, alg pinned) → ICurrentUser.sub
+    A->>A: validate JWT (iss, aud, exp, alg pinned) -> ICurrentUser.sub
     A->>D: SELECT … WHERE owner_id = sub AND state = … ORDER BY … LIMIT 50
     A-->>B: 200 {items, page, pageSize, totalCount} · Cache-Control: no-store
 ```
@@ -272,14 +272,14 @@ sequenceDiagram
     participant U as UI (TanStack Query)
     participant A as API
     participant D as PostgreSQL
-    U->>U: optimistic update → "done"
+    U->>U: optimistic update -> "done"
     U->>A: PUT /api/todos/{id}/state · If-Match: "845210"
-    A->>A: TodoItem.ChangeState() → TodoTransitions allows scheduled → done
+    A->>A: TodoItem.ChangeState() -> TodoTransitions allows scheduled -> done
     A->>D: UPDATE … WHERE id = … AND xmin = 845210
     alt updated
         A-->>U: 200 item · ETag "845377"
     else changed elsewhere
-        D-->>A: 0 rows → DbUpdateConcurrencyException
+        D-->>A: 0 rows -> DbUpdateConcurrencyException
         A-->>U: 409 problem+json · code todo.version_conflict
         U->>U: roll back · refetch · show message
     end
@@ -320,7 +320,7 @@ sequenceDiagram
     G->>K: helm upgrade todo-api --atomic
     K->>D: pre-upgrade hook: migration Job (expand-only, N−1 compatible)
     K->>K: rolling update · readiness gates · auto-rollback on failure
-    G->>G: smoke: GET / → 200 · GET /api/auth/me → 401 problem+json · TLS valid
+    G->>G: smoke: GET / -> 200 · GET /api/auth/me -> 401 problem+json · TLS valid
     G->>K: helm upgrade todo-web --atomic
     G->>G: smoke again
 ```
@@ -349,7 +349,7 @@ sequenceDiagram
 
 | ADR | Area | Decision in one line |
 |---|---|---|
-| [0001](adr/0001-security-authentication-and-authorization.md) | Security | App-managed passwords (PBKDF2) → JWT in an `HttpOnly` cookie (or bearer); deny by default; owner filter; eight defence layers; federation path designed in |
+| [0001](adr/0001-security-authentication-and-authorization.md) | Security | App-managed passwords (PBKDF2) -> JWT in an `HttpOnly` cookie (or bearer); deny by default; owner filter; eight defence layers; federation path designed in |
 | [0002](adr/0002-technology-stack.md) | Core stack | Next.js (with guardrails), .NET LTS, Azure, managed PostgreSQL |
 | [0003](adr/0003-performance.md) | Performance | Static shell + client data; TanStack Query; no server caches; async I/O; one service; no CQRS read models |
 | [0004](adr/0004-scalability.md) | Scalability | X-axis scaling of stateless tiers; a vertical database with a bounded replica rule; REST; synchronous only; modular monolith |
@@ -376,7 +376,7 @@ sequenceDiagram
 | Testing | xUnit v3, Shouldly, Testcontainers, Respawn, `FakeLogger`, `FakeClock`, ArchUnitNET, Vitest, Testing Library, vitest-axe, size-limit. **Deferred:** Playwright, k6, Lighthouse CI, MSW |
 | Quality and security | Analysers + warnings as errors, ESLint, Prettier, `oasdiff`, gitleaks, Trivy, Dependabot, CodeQL (where available), tflint, kubeconform |
 
-Full list with sources: [ADR index → Technology summary](adr/README.md).
+Full list with sources: [ADR index -> Technology summary](adr/README.md).
 
 ---
 
@@ -463,7 +463,7 @@ These are decisions recorded as open in the ADRs or the AI log, and document upd
 
 ---
 
-## 10. Requirements → design traceability
+## 10. Requirements -> design traceability
 
 | Requirement | Designed in | Verified by |
 |---|---|---|

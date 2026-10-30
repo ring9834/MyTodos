@@ -53,13 +53,13 @@
 
 | Concern | Decision | Rejected |
 |---|---|---|
-| **Macro-structure** | **Tiered + modular monolith** (confirming ADR-0004): edge → Next.js web tier → one .NET API → PostgreSQL; plus a migration Job built from the API image | Microservices; micro-frontends; serverless (C-6) |
+| **Macro-structure** | **Tiered + modular monolith** (confirming ADR-0004): edge -> Next.js web tier -> one .NET API -> PostgreSQL; plus a migration Job built from the API image | Microservices; micro-frontends; serverless (C-6) |
 | **Backend layering** | **Clean Architecture, with four projects:** `Todo.Domain` ← `Todo.Application` ← `Todo.Infrastructure`, with `Todo.Api` as the host and composition root | Vertical slices in one project (the previous version of this ADR); classic N-layer; hexagonal ports for everything |
 | **Dependency rule** | **Enforced by the compiler** (project references), plus architecture tests for what the compiler can't check | Convention only |
 | **Pragmatic guardrails** | Application reaches data through **`IAppDbContext`** (an interface over the EF Core context, not a repository); **plain handler classes** (no mediator); **hand-written mapping** | A repository per entity; MediatR; AutoMapper |
 | **Modules across layers** | `Auth` and `Todos` are **feature folders inside each layer** (e.g. `Todo.Application/Todos/…`); modules reference each other by id only | A project per module (for now) |
 | **Use cases** | **One folder per use case** in Application: `Commands/CreateTodo/`, `Queries/ListTodos/` (command or query + handler) | One large service class per entity |
-| **API style** | **Controller-based RESTful API:** `[ApiController]` controllers in `Todo.Api`, one per resource (`TodosController`, `AuthController`), attribute routing, **thin**: bind → call the handler → return the success result | Minimal APIs |
+| **API style** | **Controller-based RESTful API:** `[ApiController]` controllers in `Todo.Api`, one per resource (`TodosController`, `AuthController`), attribute routing, **thin**: bind -> call the handler -> return the success result | Minimal APIs |
 | **Domain model** | **Rich entity** (`TodoItem` enforces BR-1 to BR-5 through guard clauses and methods); rule violations **thrown as specific exceptions**, mapped to ProblemDetails in one place (ADR-0008) | An anemic entity; full DDD |
 | **Persistence** | **One `AppDbContext`** in Infrastructure, implementing `IAppDbContext`; configurations, migrations, interceptor and seeder in Infrastructure | A DbContext per module (for now) |
 | **Tests** | `Todo.UnitTests` (Domain + Application, no Docker; architecture tests) and `Todo.IntegrationTests` (HTTP + auth + real PostgreSQL) | A test project per layer |
@@ -98,7 +98,7 @@ Micro-frontends, a separate BFF container and a service mesh are rejected or def
 |---|---|---|---|
 | **Clean Architecture with four projects** | **The compiler enforces the dependency rule:** Domain *cannot* reference EF Core or ASP.NET Core. A structure most .NET reviewers recognise at a glance (P-3). Infrastructure concerns (hashing, tokens, persistence) sit behind Application interfaces, so federation (ADR-0001 §6) swaps one implementation. Application logic is testable without HTTP | More files per change (§3.10): **about 12 instead of about 8** for a new field. More project references and DI registration | **Chosen** |
 | Vertical slices in one project (previous version) | Fewest files per change; one folder per use case | Dependency direction enforced only by tests; less familiar shape to reviewers | Superseded |
-| Classic N-layer (controller → service → repository) | Familiar | Pass-through layers; a repository hides EF features (ADR-0006) | Rejected |
+| Classic N-layer (controller -> service -> repository) | Familiar | Pass-through layers; a repository hides EF features (ADR-0006) | Rejected |
 | Hexagonal (ports and adapters) for every dependency | Maximum isolation | A port for everything; ceremony without matching benefit | Rejected. The Application interfaces (§3.3) **are** this system's ports, only where needed |
 
 **Why the change is worth its cost.** The choice between these two options is a genuine trade-off: compiler-enforced boundaries and recognisability against change amplification. The deciding factors:
@@ -123,7 +123,7 @@ flowchart TB
 | **Todo.Domain** | `TodoItem`, `TodoState`, `TodoTransitions`, `User`, value objects (e.g. `GeoPoint`); **guard clauses** (`ArgumentException`); domain exceptions (`InvalidTodoTransitionException`) | Nothing (the .NET base library only) | Any NuGet package; any other project |
 | **Todo.Application** | Use cases (commands and queries with their handlers; handlers throw `KeyNotFoundException` when the owner-filtered lookup finds nothing); response DTOs + `ToResponse()` mapping (including `allowedTransitions`); **interfaces**: `IAppDbContext`, `ICurrentUser`, `IPasswordHasher`, `ITokenIssuer`; `AddApplication()` | Domain; EF Core (for `DbSet` and async LINQ, see §3.4) | Infrastructure; ASP.NET Core |
 | **Todo.Infrastructure** | `AppDbContext` (implements `IAppDbContext`; global owner filter); EF configurations; migrations; audit interceptor; `UserSeeder`; `PasswordHasher` and `JwtTokenIssuer` implementations; `AddInfrastructure()` | Application (and so Domain); Npgsql; JWT libraries | ASP.NET Core endpoint code |
-| **Todo.Api** | `Program.cs` (composition root; migrate/seed entry point for the Job); controllers (`[ApiController]`); `CurrentUser` (implements `ICurrentUser` from the request's claims); authentication and authorization configuration (cookie **or** bearer JWT validation, ADR-0001); exception → ProblemDetails mapping (`Middleware/TodoExceptionHandler`, ADR-0008); rate limiting; health | Application; Infrastructure **only for DI registration** | Infrastructure types in endpoint code |
+| **Todo.Api** | `Program.cs` (composition root; migrate/seed entry point for the Job); controllers (`[ApiController]`); `CurrentUser` (implements `ICurrentUser` from the request's claims); authentication and authorization configuration (cookie **or** bearer JWT validation, ADR-0001); exception -> ProblemDetails mapping (`Middleware/TodoExceptionHandler`, ADR-0008); rate limiting; health | Application; Infrastructure **only for DI registration** | Infrastructure types in endpoint code |
 
 **Where ADR-0001's security pieces land:**
 - **Token issuing:** an `ITokenIssuer` interface in Application, implemented in Infrastructure. Federation replaces this implementation.
@@ -244,7 +244,7 @@ my-todo/
 ├── .github/                         # CI/CD workflows (Deployment ADR)
 ├── api/
 │   ├── Directory.Build.props        # shared settings: nullable, warnings as errors, analysers, LangVersion
-│   ├── Dockerfile                   # multi-stage: build → migration bundle → runtime image
+│   ├── Dockerfile                   # multi-stage: build -> migration bundle -> runtime image
 │   ├── Todo.slnx
 │   ├── src/
 │   │   ├── Todo.Domain/
@@ -272,7 +272,7 @@ my-todo/
 │   │       ├── Program.cs                   # composition root; "migrate" / "seed" entry points for the Job
 │   │       ├── Controllers/                 # AuthController.cs, TodosController.cs (thin, [ApiController])
 │   │       ├── Identity/CurrentUser.cs      # implements ICurrentUser from claims
-│   │       ├── Middleware/TodoExceptionHandler.cs   # exception → ProblemDetails (ADR-0008)
+│   │       ├── Middleware/TodoExceptionHandler.cs   # exception -> ProblemDetails (ADR-0008)
 │   │       └── DependencyInjection.cs       # AddApi(): auth (cookie or bearer), rate limiting, health, OpenAPI
 │   └── tests/
 │       ├── Todo.UnitTests/                  # domain rules and guard clauses; mapping; exception-handler table; architecture tests; no Docker
@@ -348,7 +348,7 @@ A top-level `src/features/` folder is an equally valid convention. Keeping featu
 
 | Rule | Enforced by |
 |---|---|
-| Domain → nothing; Application ↛ Infrastructure / ASP.NET Core; Infrastructure ↛ Api | **Compiler** (project references) |
+| Domain -> nothing; Application ↛ Infrastructure / ASP.NET Core; Infrastructure ↛ Api | **Compiler** (project references) |
 | Domain has **no package references** at all | Architecture test (guards against someone adding one) |
 | Controllers don't use Infrastructure types (only `Program.cs` / DI does) | Architecture test |
 | `Todos` code doesn't reference `Auth` code (in any layer) | Architecture test (namespaces) |
@@ -417,12 +417,12 @@ A top-level `src/features/` folder is an equally valid convention. Keeping featu
 
 | Decision area | Constraint or input from this decision |
 |---|---|
-| **Communication & interaction** | A controller per resource with attribute routing (`api/auth`, `api/todos`); commands bound directly as request bodies; exception → status mapping in `TodoExceptionHandler` (ADR-0008); `allowedTransitions` in `TodoResponse` |
+| **Communication & interaction** | A controller per resource with attribute routing (`api/auth`, `api/todos`); commands bound directly as request bodies; exception -> status mapping in `TodoExceptionHandler` (ADR-0008); `allowedTransitions` in `TodoResponse` |
 | **Cross-cutting concerns** | Validation by domain guard clauses; exception mapping in Api (ADR-0008); auth pipeline configured in Api; token issuing and hashing in Infrastructure; logging conventions |
 | **Data architecture** | `AppDbContext`, configurations, migrations, interceptor and seeder in `Todo.Infrastructure`; `IAppDbContext` in Application; no cross-module navigation properties |
 | **Deployment & operations** | `api/Dockerfile` builds the API image and the migration bundle (from Infrastructure, with Api as the start-up project); the Job runs the migrate/seed entry point; `.gitignore` and `.dockerignore` exclude `.vs/`, `artifacts/`, `.next/`, `node_modules/` |
 | **Technology & tooling** | ASP.NET Core MVC controllers (`[ApiController]`, `ControllerBase`); an architecture-test library (e.g. ArchUnitNET or NetArchTest); two .NET test projects; an ESLint import-restriction rule |
-| **Evolution & extensibility** | Extraction path: a project per module → a DbContext per module → a separate service. Federation: replace `JwtTokenIssuer`, update Api validation |
+| **Evolution & extensibility** | Extraction path: a project per module -> a DbContext per module -> a separate service. Federation: replace `JwtTokenIssuer`, update Api validation |
 
 ---
 

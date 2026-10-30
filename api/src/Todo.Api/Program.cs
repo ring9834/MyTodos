@@ -98,6 +98,13 @@ builder.Services.AddOpenTelemetry()
         .AddRuntimeInstrumentation()
         .AddConsoleExporter());
 
+// Bridges ILogger into OTel.
+// Note that we did not call builder.Logging.ClearProviders(), so the default providers(Console, Debug, EventSource, OpenTelemetry (Console exporter)) that WebApplication.CreateBuilder registers remain active:
+// One log record is fan-out to all of those providers. In practice we will see it:
+// In the console / terminal (once as plain text from the Console provider, and once again as a structured OpenTelemetry record from the Console exporter).
+// In the debugger output window in Development.
+// Nowhere on disk, unless the host environment captures stdout.
+// As this API is hosted on Kubernetes, logs are captured by Kubernetes and forwarded to the cluster's logging backend (e.g. Loki, Elasticsearch, etc.)
 builder.Logging.AddOpenTelemetry(o => o.AddConsoleExporter());
 
 builder.Services.AddControllers();

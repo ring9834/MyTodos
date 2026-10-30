@@ -46,7 +46,7 @@
 | **Images** | Multi-stage builds; **chiseled / minimal non-root base images**; **tagged with the git SHA** (immutable, never `latest`); pushed to ACR (Basic) | Mutable tags |
 | **Helm** | **Two application charts** (`todo-api`, `todo-web`), so the API rolls out before the web (ADR-0009); platform add-ons as separate releases with pinned versions | One umbrella chart; Terraform managing in-cluster resources |
 | **Terraform** | One root module for Azure resources; per-environment `tfvars` and state keys; remote state in Azure Storage with locking; `plan` on PR, **apply the reviewed plan file** on approval | Terraform workspaces for environments; local state |
-| **Secrets delivery** | **Terraform writes generated secrets to Key Vault** → the deploy workflow reads them (OIDC identity) → creates Kubernetes Secrets **outside Helm**; charts reference them by name | Secrets in Helm values (stored in release history); GitHub secrets as the source of truth |
+| **Secrets delivery** | **Terraform writes generated secrets to Key Vault** -> the deploy workflow reads them (OIDC identity) -> creates Kubernetes Secrets **outside Helm**; charts reference them by name | Secrets in Helm values (stored in release history); GitHub secrets as the source of truth |
 | **Environments** | **Local** (Docker Compose), **CI** (ephemeral, Testcontainers), **prod** (the one cloud environment). Structured so **staging** is a new `tfvars` + values file + GitHub environment | A full dev/test/staging/prod set in the trial |
 | **Release strategy** | **Rolling update** (`maxUnavailable: 0`, `maxSurge: 1`) + readiness gates + `helm --atomic` + expand/contract migrations + API-first ordering; feature flags decouple release from deploy (ADR-0008) | Blue/green; canary (deferred: NGINX canary annotations make it the next step) |
 | **Rollback** | Application: `helm rollback` to the previous SHA. Database: **forward-only** (ADR-0006) | Down-migrations in production |
@@ -104,7 +104,7 @@
 | Request body limit | `nginx.ingress.kubernetes.io/proxy-body-size: "64k"` on the API Ingress | ADR-0009 §3.7 |
 | Compression | In the controller configuration where the add-on exposes it. Otherwise: Next.js compresses its own responses (its default), and the API's JSON is small | ADR-0003 |
 | **Snippets** | **Never** use `configuration-snippet` / `server-snippet` annotations (they stay disabled) | Snippet injection has been the source of serious ingress-nginx vulnerabilities |
-| Public IP and DNS | The controller's `LoadBalancer` service carries the Azure DNS-label annotation → `<label>.<region>.cloudapp.azure.com` (set through the add-on's `NginxIngressController` resource, or chart values for the community chart) | Free, stable hostname for Let's Encrypt |
+| Public IP and DNS | The controller's `LoadBalancer` service carries the Azure DNS-label annotation -> `<label>.<region>.cloudapp.azure.com` (set through the add-on's `NginxIngressController` resource, or chart values for the community chart) | Free, stable hostname for Let's Encrypt |
 | Replicas | Managed by the add-on (2 where capacity allows) | Q4 |
 
 **The API chart's Ingress template:**
@@ -180,16 +180,16 @@ flowchart LR
 | Workflow | Trigger | Steps | Identity |
 |---|---|---|---|
 | **`ci.yml`** | Every PR and push (path filters per area) | Everything that can fail fast without the cloud (above) | None needed |
-| **`infra.yml`** | PRs touching `infra/` (plan); `main` (apply, with approval) | `terraform plan -out` → reviewed → **apply that exact plan file** | OIDC identity with rights on the resource group |
+| **`infra.yml`** | PRs touching `infra/` (plan); `main` (apply, with approval) | `terraform plan -out` -> reviewed -> **apply that exact plan file** | OIDC identity with rights on the resource group |
 | **`platform.yml`** | Changes to `deploy/platform/`; manual | Install or upgrade cert-manager, the `ClusterIssuer` and the `Certificate` (the ingress controller itself is the AKS add-on, enabled by Terraform); bootstrap database roles (once) | OIDC identity with cluster-admin via Azure RBAC |
-| **`deploy.yml`** | `main` after CI passes; manual re-run | Build and push SHA-tagged images → secrets → **API release (migration hook runs first)** → smoke → **web release** → smoke | OIDC identity: `AcrPush`, cluster deploy role, Key Vault Secrets User |
+| **`deploy.yml`** | `main` after CI passes; manual re-run | Build and push SHA-tagged images -> secrets -> **API release (migration hook runs first)** -> smoke -> **web release** -> smoke | OIDC identity: `AcrPush`, cluster deploy role, Key Vault Secrets User |
 
 **Smoke tests** run against the public URL. They prove the edge, TLS, routing and pods are all wired up, without needing a test account:
 - `GET /` returns 200.
 - `GET /api/auth/me` returns **401 problem+json**, which proves routing and the API are up.
 - The certificate is valid.
 
-Full user journeys (sign in → create → schedule → complete → delete → sign out) are **checked manually** from the release checklist; browser automation is deferred (ADR-0011 D6).
+Full user journeys (sign in -> create -> schedule -> complete -> delete -> sign out) are **checked manually** from the release checklist; browser automation is deferred (ADR-0011 D6).
 
 ### 3.5 Images
 
@@ -216,7 +216,7 @@ Full user journeys (sign in → create → schedule → complete → delete → 
 |---|---|---|
 | `Deployment` | Rolling update `maxUnavailable: 0`, `maxSurge: 1`; **startup, readiness and liveness probes** (`/health/ready`, `/health/live`); resource requests and limits from observed usage; `securityContext` (non-root, read-only root filesystem, drop all capabilities, `RuntimeDefault` seccomp); `terminationGracePeriodSeconds` + a short `preStop` delay so the edge stops routing before shutdown | ADR-0001, ADR-0004 |
 | `Service` | ClusterIP only | ADR-0001 |
-| `Ingress` | `/api` → this service; `ingressClassName` + `nginx.ingress.kubernetes.io` annotations (§3.2) | ADR-0009 |
+| `Ingress` | `/api` -> this service; `ingressClassName` + `nginx.ingress.kubernetes.io` annotations (§3.2) | ADR-0009 |
 | `HorizontalPodAutoscaler` | Min 2, bounded max (ADR-0004 rule), CPU ~70% | ADR-0004 |
 | `PodDisruptionBudget` | `minAvailable: 1` | Q4 |
 | `NetworkPolicy` | Ingress traffic only from the ingress controller's namespace; egress only to PostgreSQL, DNS and the telemetry endpoint | ADR-0001 |
@@ -315,15 +315,15 @@ OpenAPI is used (ADR-0009). In the delivery pipeline:
 
 | Runbook (`docs/runbook.md`) | Contents |
 |---|---|
-| Deploy | Merge to `main` → approve the `prod` environment → watch smoke tests |
-| Rollback | `helm history` → `helm rollback` (API and/or web); never roll back the database |
-| Emergency sign-out of all users | Rotate the JWT signing key in Key Vault → redeploy (ADR-0001 R1) |
-| Restore the database | Point-in-time restore to a new server → switch the connection secret (ADR-0006) |
+| Deploy | Merge to `main` -> approve the `prod` environment -> watch smoke tests |
+| Rollback | `helm history` -> `helm rollback` (API and/or web); never roll back the database |
+| Emergency sign-out of all users | Rotate the JWT signing key in Key Vault -> redeploy (ADR-0001 R1) |
+| Restore the database | Point-in-time restore to a new server -> switch the connection secret (ADR-0006) |
 | Scale | Change HPA bounds or node count in values / `tfvars` (never by hand) |
 | Certificate problems | Check the cert-manager `Certificate` and `Order` status |
 | **Pause to save cost** | `az aks stop` / `az postgres flexible-server stop` between demos; start them well before the interview (P-1). A stopped PostgreSQL server restarts automatically after about 7 days |
 | Teardown | `terraform destroy` after the interview (NFR-8) |
-| **Rebuild from zero** | Bootstrap → infra → platform → deploy; timed once to prove NFR-4 |
+| **Rebuild from zero** | Bootstrap -> infra -> platform -> deploy; timed once to prove NFR-4 |
 
 ---
 
@@ -336,7 +336,7 @@ OpenAPI is used (ADR-0009). In the delivery pipeline:
 | S1 | **Readiness probes + `--atomic`.** Automatic rollback is only as good as the readiness signal | Availability (Q4) |
 | S2 | **Migration hook ordering and compatibility** | Availability, Data integrity |
 | S3 | **Surge capacity.** `maxSurge: 1` needs room for one extra pod per deployment, which is tight on a single small node | Availability, Cost |
-| S4 | **Secrets flow** (Key Vault → Kubernetes Secrets, outside Helm) | Security |
+| S4 | **Secrets flow** (Key Vault -> Kubernetes Secrets, outside Helm) | Security |
 | S5 | **Certificate issuance and renewal** (cert-manager, Let's Encrypt, DNS label) | Availability, Security (NFR-10) |
 | S6 | **Trial quota** | Availability, Scalability |
 
@@ -373,7 +373,7 @@ OpenAPI is used (ADR-0009). In the delivery pipeline:
 | N1 | Stored cloud credentials leaking from CI | There are none: OIDC federation |
 | N2 | "Works on my machine" differences | The same images run locally (Compose), in CI and in prod |
 | N3 | Ambiguous deployments or rollbacks | Immutable SHA tags; Helm revision history |
-| N4 | Secrets in git, images or Helm history | Key Vault → Kubernetes Secrets outside Helm; secret scanning in CI |
+| N4 | Secrets in git, images or Helm history | Key Vault -> Kubernetes Secrets outside Helm; secret scanning in CI |
 
 ---
 
@@ -402,7 +402,7 @@ OpenAPI is used (ADR-0009). In the delivery pipeline:
 | **Cross-cutting (ADR-0008)** | Application Insights and the budget in Terraform; the connection string delivered as a secret; Aspire dashboard in Compose |
 | **Communication (ADR-0009)** | Two `Ingress` resources on one host implement the same-origin routing; `/health` isn't routed; the body limit at the edge; API-first releases |
 | **Technology & tooling** | GitHub Actions; Terraform `azurerm` (+ `random`); Helm; AKS application routing add-on (NGINX Ingress, `nginx.ingress.kubernetes.io` annotations); cert-manager; Let's Encrypt; Trivy; kubeconform; tflint; gitleaks |
-| **Evolution & extensibility** | Staging; canary (NGINX canary annotations + Flagger / Argo Rollouts); migrate Ingress → Gateway API; GitOps (Flux); Application Gateway for Containers or Front Door with WAF; private networking; Key Vault CSI; AKS Standard tier, zones, cluster autoscaler |
+| **Evolution & extensibility** | Staging; canary (NGINX canary annotations + Flagger / Argo Rollouts); migrate Ingress -> Gateway API; GitOps (Flux); Application Gateway for Containers or Front Door with WAF; private networking; Key Vault CSI; AKS Standard tier, zones, cluster autoscaler |
 
 ---
 
@@ -411,14 +411,14 @@ OpenAPI is used (ADR-0009). In the delivery pipeline:
 | Check | How | Driver |
 |---|---|---|
 | Infrastructure has no drift | `terraform plan` after apply shows no changes | NFR-4 |
-| Rebuild from zero | Run bootstrap → infra → platform → deploy on a fresh subscription or resource group; record the time | NFR-4 |
-| A failing release rolls back | Deploy an image whose readiness fails → `--atomic` restores the previous revision; the app keeps serving | NFR-5, Q4 |
+| Rebuild from zero | Run bootstrap -> infra -> platform -> deploy on a fresh subscription or resource group; record the time | NFR-4 |
+| A failing release rolls back | Deploy an image whose readiness fails -> `--atomic` restores the previous revision; the app keeps serving | NFR-5, Q4 |
 | Zero failed requests during a rollout | **Manual drill:** a simple request loop (e.g. `curl` in a shell loop) during `helm upgrade`, counting non-2xx responses (load tooling deferred, ADR-0011 D7) | Q4 |
 | API-first ordering | The pipeline log shows the API release and smoke tests before the web release | ADR-0009 |
 | TLS | A valid certificate; HTTP redirects to HTTPS; HSTS present | NFR-10 |
 | No secrets in Helm history | `helm get values todo-api` shows no secret values | NFR-5 |
 | Keyless CI | The workflows contain no Azure client secrets; login uses OIDC | NFR-5 |
-| Health endpoints not public | `GET /health/ready` through the public URL → not found | ADR-0009 |
+| Health endpoints not public | `GET /health/ready` through the public URL -> not found | ADR-0009 |
 
 ## 7. Revisit when
 

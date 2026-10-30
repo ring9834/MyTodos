@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Proposed. **§3.2 (code organisation) superseded by ADR-0007**, which adopts Clean Architecture projects while keeping this ADR's rejections of MediatR, AutoMapper and repositories. **§3.3's time seam and §3.4's front-end MSW are superseded by ADR-0011** |
 | **Date** | 2026-09-29 |
-| **Decision area** | Quality Attributes → **Testability** and **Maintainability / modifiability** |
+| **Decision area** | Quality Attributes -> **Testability** and **Maintainability / modifiability** |
 | **Method** | Attribute-Driven Design, using the SEI modifiability tactics (increase cohesion, reduce coupling, defer binding) and testability tactics (control and observe state, limit complexity); analysed with ATAM concepts |
 | **Related** | `docs/requirements.md`: NFR-1, NFR-2, Q5, Q2, Q1, Q6, Q8, P-2, P-3; ADR-0001 (real tokens in tests); ADR-0002 (.NET, Next.js, PostgreSQL); ADR-0003 (command/query separation in code, TanStack Query); ADR-0004 (modular monolith) |
 
@@ -17,7 +17,7 @@
 | Driver | Summary | Priority |
 |---|---|---|
 | **NFR-1** Testability | Automated tests cover the business rules, API behaviour and UI behaviour, and run on every change | Must |
-| **Q5** Modifiability | Add a new field end to end (storage → API → UI → tests) **without AI in under 30 minutes** | M/L |
+| **Q5** Modifiability | Add a new field end to end (storage -> API -> UI -> tests) **without AI in under 30 minutes** | M/L |
 | **P-2 / P-3** | Changes will be made live without AI, and I must explain the code | Process constraint |
 | **Q2** Correctness | Every legal state transition succeeds and every illegal one is rejected | H/H |
 | **Q1, Q6, Q8** | Isolation, concurrency and authentication must be *proven* by tests | H/H, M/M, H/L |
@@ -86,7 +86,7 @@ Q5 makes that cost concrete. **Every extra layer is another file to edit, live, 
 |---|---|---|
 | **Vertical slices / feature folders** (e.g. `Todos/` holds the entity, rules, endpoints, request and response models, and mapping) | Low: one folder, plus a migration, the UI and tests | **Chosen** |
 | Clean Architecture with separate projects (Domain / Application / Infrastructure / Api) | High: the entity, DTOs, commands, handlers, interfaces, repositories and mappings are spread across 4 projects | Rejected at this size. Its benefits (swappable infrastructure, strict dependency direction) don't pay off for one CRUD domain |
-| Classic N-layer (controller → service → repository per entity) | Medium–high: 3–4 pass-through layers | Rejected |
+| Classic N-layer (controller -> service -> repository per entity) | Medium–high: 3–4 pass-through layers | Rejected |
 
 **Rejected supporting patterns:**
 
@@ -173,7 +173,7 @@ The shape is the "testing trophy" rather than a strict pyramid: **integration te
 | **Unit** | Pure rules: the transition table, domain guard clauses, mapping, the exception-handler table | xUnit | Q2 (all from/to pairs), BR-1 to BR-5 |
 | **API integration** (the backbone) | The real HTTP pipeline + real auth + real PostgreSQL | xUnit, `WebApplicationFactory`, Testcontainers (PostgreSQL), a database reset between tests (e.g. Respawn) | Q1, Q6, Q8, Q3, NFR-2, NFR-3, the error format |
 | **UI component** | Components with real hooks against a mocked network | Vitest, Testing Library (queries by role and label), a stubbed `fetch` (ADR-0011) | FR behaviour, validation messages, optimistic rollback, NFR-9 |
-| **Full-stack journeys** | Sign in → create → schedule → complete → delete → sign out, through the deployed system | **A manual checklist** + `curl` smoke after deploy (Playwright deferred, ADR-0011 D6) | The deployed wiring |
+| **Full-stack journeys** | Sign in -> create -> schedule -> complete -> delete -> sign out, through the deployed system | **A manual checklist** + `curl` smoke after deploy (Playwright deferred, ADR-0011 D6) | The deployed wiring |
 
 **Supporting rules:**
 - **Determinism:** no sleeps; time is controlled with `FakeClock`; each test creates its own data; the database is reset between tests.
@@ -206,7 +206,7 @@ public static class TodoTransitions
     private static readonly Dictionary<TodoState, TodoState[]> Allowed = new()
     {
         [TodoState.Todo]      = [TodoState.Scheduled],
-        [TodoState.Scheduled] = [TodoState.Todo, TodoState.Scheduled, TodoState.Done], // Scheduled→Scheduled = reschedule
+        [TodoState.Scheduled] = [TodoState.Todo, TodoState.Scheduled, TodoState.Done], // Scheduled->Scheduled = reschedule
         [TodoState.Done]      = [],                                                     // terminal
     };
 
@@ -216,7 +216,7 @@ public static class TodoTransitions
 ```
 
 - **The API returns `allowedTransitions` on each item.** The UI renders the state options from that list, so **the rule lives only in the backend**. The UI never duplicates it and can't drift from it.
-- **The UI has one label and colour map, with a fallback** (unknown status → its raw name, in a neutral colour). A backend-only addition therefore doesn't break the UI.
+- **The UI has one label and colour map, with a fallback** (unknown status -> its raw name, in a neutral colour). A backend-only addition therefore doesn't break the UI.
 - **Guard tests make the change safe:**
   - A table-driven test lists every (from, to) pair from the enum and compares it with an explicit expected matrix. A new status fails the test until its rows are *consciously* decided.
   - A completeness test asserts that every enum value has an entry in the table.
@@ -256,7 +256,7 @@ public static class TodoTransitions
 | S1 | **The transition table as the single source of truth,** also served to the UI | Modifiability, Correctness (Q2) |
 | S2 | **The number of abstractions and layers** (change amplification) | Modifiability (Q5), Testability |
 | S3 | **Test isolation and the database reset strategy** | Testability (reliability and speed) |
-| S4 | **The OpenAPI → TypeScript generation step** | Modifiability; front-end / back-end consistency |
+| S4 | **The OpenAPI -> TypeScript generation step** | Modifiability; front-end / back-end consistency |
 | S5 | **Seam placement:** too few seams make code untestable; too many make it hard to change | Testability vs Modifiability |
 
 ### 4.2 Trade-offs
@@ -311,7 +311,7 @@ public static class TodoTransitions
 | **Communication & interaction** | OpenAPI is the contract; each item's response includes `allowedTransitions`; a validation error format the UI can map onto form fields |
 | **Data architecture** | State stored as a string; whether to add a check constraint (integrity vs one migration line per new status); the ORM used directly |
 | **Cross-cutting concerns** | The validation approach (library or built-in); `IClock` everywhere instead of the static clock (ADR-0011); options for configuration |
-| **Technology & tooling** | **Finalised in ADR-0011:** xUnit v3, Shouldly, Testcontainers, Respawn, `FakeClock`, NSubstitute (sparingly), ArchUnitNET; Vitest, Testing Library, a stubbed `fetch` (MSW deferred); Playwright and k6 deferred (ADR-0011 D6, D7); an OpenAPI → TypeScript generator; analysers and linters |
+| **Technology & tooling** | **Finalised in ADR-0011:** xUnit v3, Shouldly, Testcontainers, Respawn, `FakeClock`, NSubstitute (sparingly), ArchUnitNET; Vitest, Testing Library, a stubbed `fetch` (MSW deferred); Playwright and k6 deferred (ADR-0011 D6, D7); an OpenAPI -> TypeScript generator; analysers and linters |
 | **Deployment & operations** | CI gates: build with warnings as errors, all tests, generated-types check, lint; Docker available on the CI runners |
 | **Evolution & extensibility** | A trigger for data-driven workflows (§3.6 D) and for a state-machine library (§3.6 E) |
 

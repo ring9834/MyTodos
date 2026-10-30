@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Proposed |
 | **Date** | 2026-09-29 |
-| **Decision area** | Technology & Tooling → **core stack** |
+| **Decision area** | Technology & Tooling -> **core stack** |
 | **Method** | Attribute-Driven Design (selection against drivers); analysed with ATAM concepts |
 | **Related** | `docs/requirements.md`: C-1 to C-7, A0, A5, Q1–Q8, NFR-1, NFR-7, NFR-8, P-2, P-5; ADR-0001 §6–§7 |
 | **Supersedes** | The earlier draft of this ADR, which assumed a stack without evaluating it |
@@ -29,7 +29,7 @@ Other technology choices are made in the ADR for their own decision area, where 
 | Technology concern | Decided under |
 |---|---|
 | Edge / TLS termination, CI/CD platform, Terraform and Helm layout | Deployment & Operations |
-| Test frameworks and tools | Quality Attributes → Testability |
+| Test frameworks and tools | Quality Attributes -> Testability |
 | Logging, validation and configuration libraries | Cross-cutting Concerns |
 | ORM and data-access patterns, migrations | Data Architecture |
 
@@ -136,7 +136,7 @@ To keep B's costs low, these **guardrails** apply:
 
 | Criterion | **A. PostgreSQL** | B. Azure SQL / SQL Server | C. Cosmos DB (document) | D. MySQL |
 |---|---|---|---|---|
-| Data shape fit | ++ Relational: users → items; filter, sort and page queries (Q3) | ++ Relational | − Document model; the relational queries and ownership filter are less natural | ++ Relational |
+| Data shape fit | ++ Relational: users -> items; filter, sort and page queries (Q3) | ++ Relational | − Document model; the relational queries and ownership filter are less natural | ++ Relational |
 | K2 Capability fit | ++ Built-in row-version column for concurrency (Q6); indexes; a mature EF Core provider | ++ Rowversion; first-class EF Core | 0 ETags for concurrency; its EF Core provider is more limited | + |
 | K4 Local testability | ++ The same engine in a lightweight container for tests | 0 The SQL Server container is heavy (~2 GB RAM) | − Emulator is heavy | ++ |
 | K6 Cost | + Small burstable managed tier | + Serverless and free-offer tiers exist | − Throughput-based pricing is easy to overspend | + |

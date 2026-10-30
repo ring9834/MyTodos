@@ -19,7 +19,7 @@ This log records how AI tools were used to build this project, what was accepted
 ## 2. Workflow
 
 ```
-Define the task myself  →  Prompt for one small piece  →  Read and question the output
+Define the task myself  ->  Prompt for one small piece  ->  Read and question the output
         ↑                                                          ↓
   Log it here  ←  Commit  ←  Verify against evidence (source docs / tests / plan / run)
 ```
@@ -39,7 +39,7 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
 
 **4.1 End-to-end plan**
 - **Asked AI to:** produce an end-to-end plan from requirements through to deployment, based on the two brief documents.
-- **Accepted:** the phase structure (requirements → architecture → backend → frontend → containers → Terraform → Helm → CI/CD → readiness → rehearsal) and the prioritisation principle of a thin vertical slice through every layer.
+- **Accepted:** the phase structure (requirements -> architecture -> backend -> frontend -> containers -> Terraform -> Helm -> CI/CD -> readiness -> rehearsal) and the prioritisation principle of a thin vertical slice through every layer.
 - **Changed / rejected:** the AI assumed a stack (React + Vite, single-user, fully permissive state transitions) without asking. I replaced these with my own decisions (see 4.4).
 - **Verified by:** checking that every mandated technology in the brief (Terraform, Kubernetes, Helm, CRUD API, tests) appears in the plan.
 
@@ -66,7 +66,7 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
   | Topic | AI's draft | My decision | Why |
   |---|---|---|---|
   | Users | Single user, auth deferred | Multi-user from day one; every item has an owner | Cheap now, expensive to retrofit; gives a real security scenario |
-  | State transitions | All transitions allowed | `todo → scheduled → done`, plus unschedule; nothing leaves `done` | Simplest rule that supports the domain; clear and testable |
+  | State transitions | All transitions allowed | `todo -> scheduled -> done`, plus unschedule; nothing leaves `done` | Simplest rule that supports the domain; clear and testable |
   | Frontend | React + Vite | Preference for Next.js (React-based, satisfies C-1); **not yet decided**, open in ADR-0002 | _[fill in your reason]_ |
   | NFR style | Flat NFR list | Measurable quality attribute scenarios with priorities | Testable, and ranked by importance and risk |
 
@@ -88,34 +88,34 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
 
 ### Phase 1: Architecture and design
 
-**Decision map and ADR-0001 (Quality Attributes → Security)**
-- **Asked AI to:** organise Phase 1 around my decision areas, and make the first decision: Quality Attributes → Security.
+**Decision map and ADR-0001 (Quality Attributes -> Security)**
+- **Asked AI to:** organise Phase 1 around my decision areas, and make the first decision: Quality Attributes -> Security.
 - **Accepted:** the tactics (app-managed credentials; JWT carried in an `HttpOnly` cookie; deny by default; a central owner filter; eight defence layers), the ATAM analysis, and the NFR-10 (HTTPS) promotion.
 - **Problem I spotted:** the ADR described Next.js, .NET, PostgreSQL, Azure/AKS and GitHub Actions as a "baseline fixed by the constraints". The brief fixes none of them: it says only "React (and any supporting libraries)", an allowed backend language, AWS or Azure, and Kubernetes. It also cited requirements A5 for Next.js, but A5 doesn't say that.
 - **Outcome:** ADR-0001 was rewritten to be technology-neutral (tactics only), with a table separating what is fixed from what is open. Stack-specific mechanisms moved to a conditional appendix. The stack references in ADR-0002 and the ADR index were corrected.
 - **Verified by:** _[✓ when done]_ re-reading C-1 to C-6 in the brief against ADR-0001 §1.2.
 - **My call still pending:** _[ ]_ the 8-hour token lifetime (T5): agree or change?
 
-**ADR-0002 (Technology & Tooling → core stack)**
+**ADR-0002 (Technology & Tooling -> core stack)**
 - **Asked AI to:** rewrite ADR-0002 as a selection within the constraints, weighing the options for the frontend, backend, cloud and data store.
 - **Accepted:** the three kinds of choice (mandated / constrained / open); the selection criteria (K1–K8); one ADR for the core stack, with other tools decided in their own areas.
 - **Key judgement:** the frontend choice was close. The AI's analysis rated a static SPA as simpler and lower-risk; Next.js was chosen on my fluency and the future BFF path, with guardrails (no Server Actions; the API remains the only enforcement point). _[fill in: confirm that you are genuinely fluent in Next.js; if not, choose the SPA]_
 - **Verified by:** _[✓ when done]_ the walking skeleton in ADR-0002 §6.
 
-**ADR-0003 (Quality Attributes → Performance)**
+**ADR-0003 (Quality Attributes -> Performance)**
 - **Asked AI to:** decide the performance approach across the front end, API, database and cloud, including rendering pattern, caching, concurrency, and TanStack Query vs Redux.
 - **Accepted:** the principle "proven defaults, measure, then optimise"; static shell + client data fetching; TanStack Query; client-side and static-asset caching only; async I/O; one API service; owner-first indexes.
 - **Checked:** the derived budgets (other than Q3) are marked as design choices, not requirements. _[fill in: do you agree with them?]_
 - **Verified by:** _[✓ when done]_ the Q3 query-plan test and the telemetry p95 check in ADR-0003 §6 (load tests deferred, ADR-0011 D7).
 - **Follow-up question I raised (ADR-0003 §3.7):** does read performance need CQRS? Added ADR-0003 §3.7. The answer is no, with the CQRS spectrum explained: only light command/query separation in code is adopted, and separate read models are rejected because of freshness (read-your-writes), identical read and write shapes, and modifiability. Explicit triggers to revisit are recorded.
 
-**ADR-0004 (Quality Attributes → Scalability)**
+**ADR-0004 (Quality Attributes -> Scalability)**
 - **Asked AI to:** decide the scalability approach across the front end, back end, database and cloud, including REST vs GraphQL vs MVC, async messaging, horizontal vs vertical scaling and autoscaling, and monolith vs microservices.
 - **Accepted:** X-axis scaling of stateless tiers; a vertical database with a bounded replica rule; CPU-based HPA (min 2, bounded max); REST; synchronous only; a modular monolith.
 - **Checked:** the workload figures in §1.3 are marked as assumptions, not requirements; the connection-limit numbers are illustrative. _[fill in: replace with the real tier limit once chosen]_
 - **Verified by:** _[✓ when done]_ the manual scale drill, HPA review and statelessness check in ADR-0004 §6.
 
-**ADR-0005 (Quality Attributes → Testability and maintainability)**
+**ADR-0005 (Quality Attributes -> Testability and maintainability)**
 - **Asked AI to:** decide on SOLID, DI, Moq and mocking, design patterns, and whether "add a status easily" belongs in scope.
 - **Accepted:** pragmatic SOLID at real seams; vertical slices; no repository, MediatR or AutoMapper; the built-in DI container; real database in tests; mocking only at external boundaries (NSubstitute); a declarative transition table with `allowedTransitions` served by the API.
 - **Checked:** the claims about Moq's 2023 incident and the MediatR / AutoMapper licence change. _[✓ when you've verified these yourself: interviewers may ask]_
@@ -129,7 +129,7 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
 - **Review rule adopted:** I review the generated SQL of every migration, including AI-generated ones, before merging.
 
 **ADR-0007 (Component & Structural)**
-- **Asked AI to:** decide on Api → Application → Domain → Infrastructure layering, modular monolith vs microservices, and related structure.
+- **Asked AI to:** decide on Api -> Application -> Domain -> Infrastructure layering, modular monolith vs microservices, and related structure.
 - **First draft (rejected by me):** the AI proposed logical layers inside vertical slices, in a single project, following its own earlier ADR-0005.
 - **My decision:** Clean Architecture with four projects (`Todo.Api`, `Todo.Application`, `Todo.Domain`, `Todo.Infrastructure`), which is what my repository already had, plus feature folders under `web/src/components/`. _[fill in your reasons in your own words, e.g. a compiler-enforced dependency rule, familiarity to reviewers]_
 - **How the conflict was handled:** ADR-0007 was revised with a change log, and ADR-0005 §3.2 was marked superseded rather than left contradicting it. ADR-0005's guardrails (no MediatR, AutoMapper or repository) were kept to limit ceremony, and the Q5 change-cost target was updated honestly (about 14 files instead of about 8).
@@ -140,7 +140,7 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
 - **Accepted:** built-in logging with JSON output and strict content rules; OpenTelemetry instrumented now with export off by default (respecting the requirements' deferral of advanced monitoring); RFC 9457 ProblemDetails with a stable `code`; outcomes vs exceptions; FluentValidation through one endpoint filter; fail-fast options validation; no feature flags yet.
 - **Checked:** the derived SLOs (99.5%, <1% errors) are marked as design choices, not requirements. _[fill in: agree?]_
 - **Verified by:** _[✓ when done]_ the log-capture test (no secrets or addresses in logs) and the no-stack-trace test in ADR-0008 §6.
-- **Changed by me:** replaced the AI's outcome types and FluentValidation filter with **ASP.NET Core's built-in ProblemDetails** (`AddProblemDetails()`, RFC 9457) and **one `IExceptionHandler` (`TodoExceptionHandler`)** mapping `KeyNotFoundException` → 404, `InvalidTodoTransitionException` → 409, `DbUpdateConcurrencyException` → 409, `ArgumentException` → 400, and anything else → 500. This uses the framework's mechanism instead of custom error middleware, and validation lives in domain guard clauses (one source of rules).
+- **Changed by me:** replaced the AI's outcome types and FluentValidation filter with **ASP.NET Core's built-in ProblemDetails** (`AddProblemDetails()`, RFC 9457) and **one `IExceptionHandler` (`TodoExceptionHandler`)** mapping `KeyNotFoundException` -> 404, `InvalidTodoTransitionException` -> 409, `DbUpdateConcurrencyException` -> 409, `ArgumentException` -> 400, and anything else -> 500. This uses the framework's mechanism instead of custom error middleware, and validation lives in domain guard clauses (one source of rules).
 - **Trade-off I accepted, with safeguards:** mapping broad framework exception types can misclassify bugs (ADR-0008 R6).
 - **Changed by me:** no `traceId` in error responses, because OpenTelemetry already correlates logs, traces and metrics. The framework adds `traceId` by default, so it's removed in `CustomizeProblemDetails`, and a test guards it. Accepted cost: a user's error report can't be matched directly to its trace (ADR-0008 R8).
 - **Changed by me:** no `ILogger` in application code. Automatic instrumentation earns its keep at instrumented library boundaries, and a single, centralised `ILogger` call at the one true chokepoint (`TodoExceptionHandler`) covers what instrumentation structurally can't reach: application-level exceptions with no span of their own.
@@ -219,11 +219,11 @@ Define the task myself  →  Prompt for one small piece  →  Read and question 
   - drivers and the utility tree
   - eight design principles distilled from the ADRs
   - container, component, deployment, data and runtime views
-  - a quality-attribute → tactic → mechanism → test table
+  - a quality-attribute -> tactic -> mechanism -> test table
   - a one-line summary per ADR
   - consolidated ATAM analysis, grouping the individual risks into seven risk themes
   - open items
-  - requirements → design traceability
+  - requirements -> design traceability
 - **Rule stated in the document:** if it disagrees with an ADR, the ADR wins.
 - **To do myself:** _[✓]_ check every diagram against the code as it's built; _[✓]_ resolve open items O1–O10 (§9).
 

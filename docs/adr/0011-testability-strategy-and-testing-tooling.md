@@ -6,8 +6,8 @@ The strategy: no generic repository layer; Testcontainers for integration tests;
 |---|---|
 | **Status** | Proposed |
 | **Date** | 2026-09-29 |
-| **Decision area** | Quality Attributes → **Testability** (strategy) and Technology & Tooling → **testing tools** |
-| **Supersedes (in part)** | **ADR-0005 §3.3** (the time seam: `TimeProvider` → `IClock`) and **ADR-0005 §3.4** (front-end network mocking: MSW → `fetch` mocks, with MSW deferred) |
+| **Decision area** | Quality Attributes -> **Testability** (strategy) and Technology & Tooling -> **testing tools** |
+| **Supersedes (in part)** | **ADR-0005 §3.3** (the time seam: `TimeProvider` -> `IClock`) and **ADR-0005 §3.4** (front-end network mocking: MSW -> `fetch` mocks, with MSW deferred) |
 | **Related** | `docs/requirements.md`: NFR-1, Q1, Q2, Q6, Q8, NFR-9; ADR-0003 (deferred caching, a triggered upgrade); ADR-0005 (test strategy, mocking policy); ADR-0006 (`xmin` concurrency); ADR-0007 (layering, `IAppDbContext`, test projects); ADR-0008 (`FakeLogger` tests); ADR-0010 (CI) |
 
 ---
@@ -142,7 +142,7 @@ There is **no automated test that drives a real browser through the full stack.*
 
 | Journey | Checks |
 |---|---|
-| Sign in → list → create → schedule → complete → delete → sign out | The whole happy path through the real browser, ingress and database |
+| Sign in -> list -> create -> schedule -> complete -> delete -> sign out | The whole happy path through the real browser, ingress and database |
 | Two users (`alice` / `bob`) | Neither sees the other's items in the UI (the API-level isolation is already automated) |
 | Map picker and day map (FR-10, FR-11) | Leaflet renders; picking a point sets the coordinates |
 | Keyboard-only use of the list and form (NFR-9) | Complements the automated axe checks at component level |
@@ -228,7 +228,7 @@ There is **no automated test that drives a real browser through the full stack.*
 |---|---|
 | Projects | `Todo.UnitTests` (Domain, mapping, the exception-handler table, ArchUnitNET rules; **no Docker**) and `Todo.IntegrationTests` (`WebApplicationFactory` + Testcontainers + Respawn + `FakeLogger`), per ADR-0007 |
 | Domain tests | Plain xUnit with no fakes: the transition matrix as a `[Theory]` over every (from, to) pair + the completeness test (ADR-0005 §3.6); guard-clause tests for BR-1 to BR-5 |
-| Integration fixture | **One PostgreSQL container per run** (an assembly fixture) → migrations applied once → **Respawn** resets the data before each test, keeping seeded users (D3) |
+| Integration fixture | **One PostgreSQL container per run** (an assembly fixture) -> migrations applied once -> **Respawn** resets the data before each test, keeping seeded users (D3) |
 | Time | `FakeClock` registered in `WebApplicationFactory` for time-sensitive tests (audit timestamps, token expiry) |
 | Authentication helper | `LoginAsync("alice")` calls `POST /api/auth/login` and returns an authenticated `HttpClient` (cookie or bearer), so `alice` / `bob` isolation tests read naturally |
 | Parallelism | Collections run in parallel where they don't share the database; database tests are serialised against the shared container, or use separate databases in the same container if the suite grows |
@@ -366,7 +366,7 @@ There is **no automated test that drives a real browser through the full stack.*
 
 | Check | How |
 |---|---|
-| Q6 is tested against real PostgreSQL `xmin` | Integration test: two updates with the same `If-Match` → the second gets 409 |
+| Q6 is tested against real PostgreSQL `xmin` | Integration test: two updates with the same `If-Match` -> the second gets 409 |
 | Q1 / Q8 go through the real login | Review: no fake authentication handler or bypass flag exists in the test projects |
 | No direct wall-clock reads | Architecture or analyser rule (R4) |
 | No repository layer | Review: no `IRepository<T>`; `IAppDbContext` exposes `DbSet`s only |

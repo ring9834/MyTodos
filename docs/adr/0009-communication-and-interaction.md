@@ -60,13 +60,13 @@
 | **Details vs lifecycle** | `PUT /todos/{id}` changes **details only** (title, address, coordinates). **State and scheduled date change only through `PUT /todos/{id}/state`** | Changing state through the general update |
 | **Representation** | JSON; `camelCase` properties; enums as lowercase strings; ids as UUID strings; dates `YYYY-MM-DD`; timestamps RFC 3339 in UTC; **every field always present** (explicit `null`) | Envelopes for single items; omitted fields |
 | **Collections** | An envelope: `{ items, page, pageSize, totalCount }`; fixed server-side sort | Bare arrays; client-chosen sort (deferred) |
-| **Concurrency token** | **`ETag` / `If-Match`**: the item's `version` is returned in the body *and* as an `ETag` header; **`If-Match` is required** on both `PUT` operations. A missing header → **428**; a stale one → **409** (ADR-0008) | The version in the request body only |
+| **Concurrency token** | **`ETag` / `If-Match`**: the item's `version` is returned in the body *and* as an `ETag` header; **`If-Match` is required** on both `PUT` operations. A missing header -> **428**; a stale one -> **409** (ADR-0008) | The version in the request body only |
 | **Errors** | RFC 9457 ProblemDetails (`application/problem+json`) with `code` for **every** non-2xx response, including 401, 415, 428 and 429 (ADR-0008) | — |
 | **Idempotency** | GET safe; PUT and DELETE idempotent by definition; POST not. No idempotency keys in the MVP | An `Idempotency-Key` header (deferred) |
 | **Content negotiation** | JSON only. Requests with a body must be `application/json` (else 415); unknown JSON properties are **ignored** (tolerant reader) | XML; strict rejection of unknown fields |
 | **Versioning** | **No version in the URL for now.** Only backward-compatible (additive) changes; the API deploys before the web; `/api/v2/…` if a breaking change is ever needed | `/api/v1` now; header or media-type versioning |
 | **Contract** | **OpenAPI generated from the controllers at build time**, committed, and turned into TypeScript types; CI fails on drift | Hand-written clients or types |
-| **Client interaction** | One fetch wrapper: same origin, cookies automatic, JSON, `If-Match` from the item's `version`, timeouts, ProblemDetails → `ApiError`. TanStack Query retries GETs only; optimistic state changes | Retrying mutations; clients in each component |
+| **Client interaction** | One fetch wrapper: same origin, cookies automatic, JSON, `If-Match` from the item's `version`, timeouts, ProblemDetails -> `ApiError`. TanStack Query retries GETs only; optimistic state changes | Retrying mutations; clients in each component |
 
 ---
 
@@ -77,8 +77,8 @@
 ```mermaid
 flowchart LR
     B([Browser]) -- "HTTPS · HTTP/2 · TLS 1.2+<br/>JSON; cookie" --> E[Edge]
-    E -- "HTTP/1.1 in cluster<br/>/ → web" --> W[Next.js web]
-    E -- "HTTP/1.1 in cluster<br/>/api/* → API" --> A[.NET API]
+    E -- "HTTP/1.1 in cluster<br/>/ -> web" --> W[Next.js web]
+    E -- "HTTP/1.1 in cluster<br/>/api/* -> API" --> A[.NET API]
     A -- "PostgreSQL wire protocol · TLS<br/>pooled connections" --> D[(PostgreSQL)]
     CI([GitHub Actions]) -- "HTTPS · OIDC" --> AZ[Azure / AKS]
 ```
@@ -139,7 +139,7 @@ Setting the state an item **already has** (with the same date) is a no-op that r
 |---|---|---|
 | Media type | `application/json` for requests and responses; `application/problem+json` for errors | — |
 | Property names | `camelCase` in both directions; binding is case-insensitive | `locationAddress` |
-| Enums | **Lowercase strings** (a string-enum converter with a camelCase policy); an unknown value → 400 | `"scheduled"` |
+| Enums | **Lowercase strings** (a string-enum converter with a camelCase policy); an unknown value -> 400 | `"scheduled"` |
 | Ids | UUID strings | `"01928f3e-…"` |
 | Dates | `YYYY-MM-DD` (`DateOnly`) | `"2026-10-01"` |
 | Timestamps | RFC 3339, UTC | `"2026-09-29T21:04:11+00:00"` |
@@ -174,7 +174,7 @@ Setting the state an item **already has** (with the same date) is a no-op that r
 - `state` filters by state; `date` matches `scheduledFor` exactly.
 - `page` is 1-based; `pageSize` defaults to 50, with a maximum of 100 (ADR-0003).
 - The sort is fixed: `scheduledFor` ascending with nulls last, then `createdAt`, then `id`. A client-chosen sort is deferred.
-- Out-of-range values → 400.
+- Out-of-range values -> 400.
 
 **Headers:**
 
@@ -198,7 +198,7 @@ Setting the state an item **already has** (with the same date) is a no-op that r
 - The ETag value is the item's `version` (the `xmin` token, ADR-0006), as a strong ETag `"845210"`.
 - List items carry `version` in the body, because a list response has no per-item headers. The client builds `If-Match` from it, so a state change can be made straight from the list.
 - **`If-Match` is required** on `PUT /todos/{id}` and `PUT /todos/{id}/state`. A missing header gets **428 Precondition Required** (code `precondition_required`), returned by a small `[RequireIfMatch]` action filter in `Todo.Api`. The controller merges the header into the command (`command with { Id = id, Version = … }`).
-- **A stale `If-Match` → 409** (`todo.version_conflict`). The conflict is detected at write time by the database, which raises `DbUpdateConcurrencyException`, mapped by `TodoExceptionHandler` (ADR-0008).
+- **A stale `If-Match` -> 409** (`todo.version_conflict`). The conflict is detected at write time by the database, which raises `DbUpdateConcurrencyException`, mapped by `TodoExceptionHandler` (ADR-0008).
   - **Deliberate deviation:** HTTP's own status for a failed precondition is **412**. 409 is kept so that all conflicts share one status and one path through the exception handler (T3).
 - `DELETE` doesn't require `If-Match` in the MVP: deletion is idempotent, and deleting an item that was just edited elsewhere is an acceptable outcome.
 
@@ -214,7 +214,7 @@ sequenceDiagram
         A-->>U: 200 item · ETag: "845377"
         U->>U: replace the cached item
     else version changed elsewhere
-        D-->>A: 0 rows → DbUpdateConcurrencyException
+        D-->>A: 0 rows -> DbUpdateConcurrencyException
         A-->>U: 409 problem+json · code todo.version_conflict
         U->>U: roll back; refetch; "changed elsewhere, please retry"
     end
@@ -236,7 +236,7 @@ sequenceDiagram
 | Requests with a body must be `Content-Type: application/json`, otherwise **415** | Part of the CSRF defence: HTML forms can't send JSON cross-site (ADR-0001 §4.3) |
 | Only JSON is produced; `Accept` values other than JSON are ignored | One representation |
 | **Request body limit ~64 KB** on the API (the largest valid request is under 1 KB) | Limits abuse (ADR-0001 layer 4) |
-| Malformed JSON or wrong types → 400 through `[ApiController]`, with `code = validation_failed` (ADR-0008) | One error contract |
+| Malformed JSON or wrong types -> 400 through `[ApiController]`, with `code = validation_failed` (ADR-0008) | One error contract |
 
 ### 3.8 Versioning and evolution
 
@@ -254,7 +254,7 @@ sequenceDiagram
 | **Never** rename or remove a field, change a type, or change a status code's meaning in place | Such changes need expand/contract across releases, like database migrations (ADR-0006 §3.4) |
 | **Deploy order: API first, then web** | The new UI never meets an old API |
 | **Clients tolerate the unknown:** unknown fields are ignored; an unknown `state` is shown with its raw name (ADR-0005 §3.6) | Forward compatibility |
-| **A breaking change that can't be avoided** → introduce `/api/v2/…` for the affected resources, running both until old clients are gone | The path when a mobile client or a third party exists |
+| **A breaking change that can't be avoided** -> introduce `/api/v2/…` for the affected resources, running both until old clients are gone | The path when a mobile client or a third party exists |
 
 ### 3.9 Contract management: keeping the API and the UI consistent
 
@@ -281,7 +281,7 @@ flowchart LR
 
 | Pattern | Decision |
 |---|---|
-| **One fetch wrapper** (`web/src/lib/api`) | Relative URLs (same origin); `credentials: 'same-origin'`; `Content-Type: application/json`; `If-Match` from `version` on PUTs; a **10 s timeout** (`AbortController`); ProblemDetails → typed `ApiError { status, code, fieldErrors }` |
+| **One fetch wrapper** (`web/src/lib/api`) | Relative URLs (same origin); `credentials: 'same-origin'`; `Content-Type: application/json`; `If-Match` from `version` on PUTs; a **10 s timeout** (`AbortController`); ProblemDetails -> typed `ApiError { status, code, fieldErrors }` |
 | Server state | TanStack Query (ADR-0003): cache keys from URL filters; invalidate `['todos']` after mutations; replace the cached item with the mutation response |
 | **Optimistic state changes** | For `PUT …/state` only (ADR-0003); rolled back on any error |
 | Retries | GETs only (§3.6) |
@@ -370,12 +370,12 @@ flowchart LR
 |---|---|
 | Every row of §3.3 returns its documented status, headers (`Location`, `ETag`, `Cache-Control: no-store`) and body shape | API integration tests |
 | Every error is `application/problem+json` with a `code` (400, 401, 404, 409, 415, 428, 429, 500) and no `traceId` | API integration tests (with ADR-0008) |
-| Missing `If-Match` → 428; stale → 409 `todo.version_conflict` | API integration tests (Q6) |
+| Missing `If-Match` -> 428; stale -> 409 `todo.version_conflict` | API integration tests (Q6) |
 | State changes only through `/state`; the details update ignores `state` | API integration tests (Q2, S4) |
-| Same-state `PUT …/state` → 200 with no change | API integration test |
+| Same-state `PUT …/state` -> 200 with no change | API integration test |
 | Unknown request fields are ignored (e.g. `ownerId`) | API integration test (ADR-0001 N4) |
 | Enums lowercase; dates `YYYY-MM-DD`; timestamps UTC; `null`s explicit | Integration test on the JSON |
-| Non-JSON body → 415; oversized body → 413 | API integration tests |
+| Non-JSON body -> 415; oversized body -> 413 | API integration tests |
 | Committed OpenAPI and generated TS types match the code | CI drift check |
 | An old UI build works against a new API build | Manual check before releases that change the contract (Should) |
 

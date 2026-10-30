@@ -8,7 +8,7 @@
 
 > **Scope.** This document turns the architecture into buildable design: domain types and rules, use cases, the API contract, the physical schema, security and configuration details, front-end structure, deployment resources, and the test design.
 > - It **does not re-argue decisions**. Each section cites the ADR that made them.
-> - **Precedence:** ADRs → `architecture.md` → this document. If this document disagrees with either, fix this document.
+> - **Precedence:** ADRs -> `architecture.md` -> this document. If this document disagrees with either, fix this document.
 > - **Values marked *(initial)*** are starting values for the build, to be tuned by measurement. They are not requirements.
 
 ---
@@ -112,7 +112,7 @@ The single source of truth (ADR-0005 §3.6):
 private static readonly Dictionary<TodoState, TodoState[]> Allowed = new()
 {
     [TodoState.Todo]      = [TodoState.Scheduled],
-    [TodoState.Scheduled] = [TodoState.Todo, TodoState.Scheduled, TodoState.Done], // Scheduled → Scheduled = reschedule
+    [TodoState.Scheduled] = [TodoState.Todo, TodoState.Scheduled, TodoState.Done], // Scheduled -> Scheduled = reschedule
     [TodoState.Done]      = [],                                                     // terminal
 };
 ```
@@ -127,7 +127,7 @@ private static readonly Dictionary<TodoState, TodoState[]> Allowed = new()
 
 ### 2.3 Behaviour and invariants
 
-| Method | Guards (→ `ArgumentException`, 400, `ParamName` = request field) | Rules (→ `InvalidTodoTransitionException`, 409) | Effects |
+| Method | Guards (-> `ArgumentException`, 400, `ParamName` = request field) | Rules (-> `InvalidTodoTransitionException`, 409) | Effects |
 |---|---|---|---|
 | `Create(id, ownerId, title, state, address, location, scheduledFor, now)` | `title` / `locationAddress` not blank and ≤ 200 / 300 characters (BR-5); `scheduledFor` present iff `state == Scheduled` (BR-1) | — | Trims text; sets `CreatedAt = UpdatedAt = now` |
 | `UpdateDetails(title, address, location, now)` | As `Create` for text and location | **A `done` item is read-only** (BR-3) | Updates the details only; never the state or date |
@@ -156,14 +156,14 @@ Each is a folder with a command or query record and a handler (ADR-0007 §3.6). 
 
 | Use case | Input | Steps | Output | FR |
 |---|---|---|---|---|
-| `Login` | `LoginCommand(username, password)` | Normalise the username → find the user → verify the hash (**verify against a dummy hash when the user doesn't exist**, to equalise timing) → issue a token | `LoginResult(MeResponse, IssuedToken)`, or `null` → the controller returns 401 | FR-1 |
+| `Login` | `LoginCommand(username, password)` | Normalise the username -> find the user -> verify the hash (**verify against a dummy hash when the user doesn't exist**, to equalise timing) -> issue a token | `LoginResult(MeResponse, IssuedToken)`, or `null` -> the controller returns 401 | FR-1 |
 | `Me` | — | Load the user by `ICurrentUser.Id` | `MeResponse(id, username)` | FR-1 |
-| `ListTodos` | `ListTodosQuery(state?, date?, page = 1, pageSize = 50)` | Validate `page ≥ 1` and `1 ≤ pageSize ≤ 100` → `AsNoTracking` → filter → **fixed sort** → count + page → project | `PagedResponse<TodoResponse>` | FR-3, FR-9 |
-| `GetTodo` | `GetTodoQuery(id)` | Find (owner-filtered) → **`KeyNotFoundException`** if absent | `TodoResponse` | FR-4 |
-| `CreateTodo` | `CreateTodoCommand(title, state, locationAddress, latitude?, longitude?, scheduledFor?)` | `TodoItem.Create(Guid.CreateVersion7(), currentUser.Id, …, clock.UtcNow)` → add → save | `TodoResponse` | FR-2 |
-| `UpdateTodo` | `UpdateTodoCommand(id, version, title, locationAddress, latitude?, longitude?)` | Find → set the original `Version` → `UpdateDetails` → save (`DbUpdateConcurrencyException` propagates) | `TodoResponse` | FR-5 |
-| `ChangeTodoState` | `ChangeTodoStateCommand(id, version, state, scheduledFor?)` | Find → set the original `Version` → `ChangeState` → save | `TodoResponse` | FR-7 |
-| `DeleteTodo` | `DeleteTodoCommand(id)` | Find → remove → save (allowed in any state, A9) | — | FR-6 |
+| `ListTodos` | `ListTodosQuery(state?, date?, page = 1, pageSize = 50)` | Validate `page ≥ 1` and `1 ≤ pageSize ≤ 100` -> `AsNoTracking` -> filter -> **fixed sort** -> count + page -> project | `PagedResponse<TodoResponse>` | FR-3, FR-9 |
+| `GetTodo` | `GetTodoQuery(id)` | Find (owner-filtered) -> **`KeyNotFoundException`** if absent | `TodoResponse` | FR-4 |
+| `CreateTodo` | `CreateTodoCommand(title, state, locationAddress, latitude?, longitude?, scheduledFor?)` | `TodoItem.Create(Guid.CreateVersion7(), currentUser.Id, …, clock.UtcNow)` -> add -> save | `TodoResponse` | FR-2 |
+| `UpdateTodo` | `UpdateTodoCommand(id, version, title, locationAddress, latitude?, longitude?)` | Find -> set the original `Version` -> `UpdateDetails` -> save (`DbUpdateConcurrencyException` propagates) | `TodoResponse` | FR-5 |
+| `ChangeTodoState` | `ChangeTodoStateCommand(id, version, state, scheduledFor?)` | Find -> set the original `Version` -> `ChangeState` -> save | `TodoResponse` | FR-7 |
+| `DeleteTodo` | `DeleteTodoCommand(id)` | Find -> remove -> save (allowed in any state, A9) | — | FR-6 |
 
 **Notes:**
 - **Commands never carry an owner** (ADR-0001 N4). `id` and `version` are merged in by the controller from the route and `If-Match` (ADR-0009 §3.5).
@@ -233,7 +233,7 @@ This restates ADR-0009 §3.3 as the build reference.
 | Rule | Detail |
 |---|---|
 | JSON options | `camelCase`; `JsonStringEnumConverter` with a camelCase policy; case-insensitive binding; **unknown properties ignored**; nulls written explicitly |
-| Dates | `DateOnly` → `YYYY-MM-DD`; `DateTimeOffset` in UTC |
+| Dates | `DateOnly` -> `YYYY-MM-DD`; `DateTimeOffset` in UTC |
 | Collections | `{ "items": [...], "page": 1, "pageSize": 50, "totalCount": 123 }` |
 | Headers | `ETag: "<version>"` on single items; `Location` on 201; `Cache-Control: no-store` on all API responses; `Retry-After` on 429 |
 | Request limits | Body ≤ 64 KB; `Content-Type: application/json` for bodies (else 415) |
@@ -324,7 +324,7 @@ CREATE TABLE todo_items (
   CONSTRAINT ck_todo_title        CHECK (length(trim(title)) > 0),
   CONSTRAINT ck_todo_address      CHECK (length(trim(location_address)) > 0)
 );
--- xmin (system column) is mapped as the concurrency token → Version
+-- xmin (system column) is mapped as the concurrency token -> Version
 
 CREATE INDEX ix_todo_owner_state_sched ON todo_items (owner_id, state, scheduled_for, created_at, id);
 CREATE INDEX ix_todo_owner_sched       ON todo_items (owner_id, scheduled_for, created_at, id);
@@ -342,8 +342,8 @@ The **Q3 query-plan test** (§10.2) asserts that the list query uses one of thes
 | Item | Configuration |
 |---|---|
 | `TodoItem.State` | `HasConversion<string>()` with the lowercase value converter; `HasMaxLength(20)` |
-| `TodoItem.Location` | An owned / complex type → `latitude`, `longitude` columns |
-| `TodoItem.Version` | `IsRowVersion()` → Npgsql maps it to `xmin` |
+| `TodoItem.Location` | An owned / complex type -> `latitude`, `longitude` columns |
+| `TodoItem.Version` | `IsRowVersion()` -> Npgsql maps it to `xmin` |
 | The global query filter | `HasQueryFilter(t => t.OwnerId == _currentUser.Id)` on `AppDbContext` (ADR-0001) |
 | The audit interceptor | Sets `created_at` / `updated_at` from `IClock` |
 | Connection | `SSL Mode=Require`; `Maximum Pool Size` from the ADR-0004 rule; `Include Error Detail=false`; retrying execution strategy; command timeout 5 s *(initial)* |
@@ -379,7 +379,7 @@ The **Q3 query-plan test** (§10.2) asserts that the list query uses one of thes
 | Control | Implementation |
 |---|---|
 | Deny by default | `AuthorizationOptions.FallbackPolicy = RequireAuthenticatedUser()`; `[AllowAnonymous]` only on `Login` and the health endpoints |
-| Owner isolation | The global query filter (§5.2) + the owner set only from `ICurrentUser` in `CreateTodo`. A not-found or not-yours item → `KeyNotFoundException` → 404 |
+| Owner isolation | The global query filter (§5.2) + the owner set only from `ICurrentUser` in `CreateTodo`. A not-found or not-yours item -> `KeyNotFoundException` -> 404 |
 | No bypass | `IgnoreQueryFilters()` is banned outside tests (an ArchUnitNET rule) |
 | CSRF | `SameSite=Strict` + JSON-only bodies + **no CORS configured** |
 
@@ -439,9 +439,9 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 | Item | Design |
 |---|---|
-| Logging | **The only `ILogger` call** is in `TodoExceptionHandler`: `Log(level, ex, "Request failed: {Status} {Code} on {Route}", …)`, with the level by status (500 → Error; 409 concurrency → Warning; other 4xx → Information). Handled-exception diagnostics are suppressed (`SuppressDiagnosticsCallback`) |
+| Logging | **The only `ILogger` call** is in `TodoExceptionHandler`: `Log(level, ex, "Request failed: {Status} {Code} on {Route}", …)`, with the level by status (500 -> Error; 409 concurrency -> Warning; other 4xx -> Information). Handled-exception diagnostics are suppressed (`SuppressDiagnosticsCallback`) |
 | Framework logs | `Microsoft.AspNetCore` and `Microsoft.EntityFrameworkCore` at Warning in Production; `EnableSensitiveDataLogging` only in Development |
-| Telemetry | OpenTelemetry traces, metrics and logs → OTLP (the Aspire dashboard locally) / Azure Monitor (cloud), unsampled at MVP volume |
+| Telemetry | OpenTelemetry traces, metrics and logs -> OTLP (the Aspire dashboard locally) / Azure Monitor (cloud), unsampled at MVP volume |
 | Health | `/health/live` (process), `/health/ready` (database), not routed by the ingress |
 
 ---
@@ -452,10 +452,10 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 | Route | Component type | Content |
 |---|---|---|
-| `/login` | Client | The sign-in form; on success → `/todos` |
+| `/login` | Client | The sign-in form; on success -> `/todos` |
 | `/todos` | Client (the static shell is pre-rendered) | The list or map view with filters in the URL: `?state=&date=&page=&view=list|map` |
 | `/` | — | Redirects to `/todos` |
-| `middleware.ts` | Edge middleware | If there's no session cookie → redirect to `/login` (**UX only**) |
+| `middleware.ts` | Edge middleware | If there's no session cookie -> redirect to `/login` (**UX only**) |
 
 ### 8.2 Feature folders
 
@@ -472,13 +472,13 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 | Item | Design *(initial values)* | ADR |
 |---|---|---|
-| Fetch wrapper | Relative URLs; `credentials: 'same-origin'`; JSON; a 10 s timeout (`AbortController`); `If-Match` from `version` on PUTs; ProblemDetails → `ApiError { status, code, fieldErrors }` | 0009 |
+| Fetch wrapper | Relative URLs; `credentials: 'same-origin'`; JSON; a 10 s timeout (`AbortController`); `If-Match` from `version` on PUTs; ProblemDetails -> `ApiError { status, code, fieldErrors }` | 0009 |
 | Query keys | `['me']`, `['todos', { state, date, page }]`, `['todo', id]` | 0003 |
 | Defaults | `staleTime: 30_000`; refetch on window focus; `retry` for GETs only; no mutation retries | 0003, 0009 |
 | Paging | `placeholderData: keepPreviousData` | 0003 |
-| State change | **Optimistic:** update the cached item → `PUT …/state` → replace it with the response; on error, roll back + a toast (`409` → refetch + "changed elsewhere") | 0003 |
+| State change | **Optimistic:** update the cached item -> `PUT …/state` -> replace it with the response; on error, roll back + a toast (`409` -> refetch + "changed elsewhere") | 0003 |
 | Create / edit / delete | Not optimistic; invalidate `['todos']` on success | 0003 |
-| 401 anywhere | Clear the cache → `/login` | 0009 |
+| 401 anywhere | Clear the cache -> `/login` | 0009 |
 | Stale chunk after a deploy | `ErrorBoundary` reloads the page once on a chunk-load failure | 0012 |
 
 ### 8.4 Forms
@@ -505,16 +505,16 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 | Image | Build | Runtime |
 |---|---|---|
-| `todo-api:<sha>` | `api/Dockerfile`: restore → publish → **EF migration bundle** | A chiseled .NET runtime; non-root; port 8080 |
-| `todo-web:<sha>` | `web/Dockerfile`: `npm ci` → `next build` (`output: 'standalone'`) | A minimal Node runtime; non-root; port 3000 |
+| `todo-api:<sha>` | `api/Dockerfile`: restore -> publish -> **EF migration bundle** | A chiseled .NET runtime; non-root; port 8080 |
+| `todo-web:<sha>` | `web/Dockerfile`: `npm ci` -> `next build` (`output: 'standalone'`) | A minimal Node runtime; non-root; port 3000 |
 
 ### 9.2 Kubernetes resources (Helm)
 
 | Chart | Resources |
 |---|---|
-| `deploy/helm/todo-api` | Deployment (2 replicas, `maxUnavailable: 0`, `maxSurge: 1`, probes, `securityContext`, `preStop`), Service (ClusterIP :80 → 8080), **Ingress** (`/api`, `nginx.ingress.kubernetes.io/force-ssl-redirect`, `proxy-body-size: 64k`, TLS `todo-tls`), HPA (min 2, max from the connection rule, CPU 70%), PDB (`minAvailable: 1`), NetworkPolicy, ConfigMap, the migration Job (hook), **`existingSecret` references only** |
+| `deploy/helm/todo-api` | Deployment (2 replicas, `maxUnavailable: 0`, `maxSurge: 1`, probes, `securityContext`, `preStop`), Service (ClusterIP :80 -> 8080), **Ingress** (`/api`, `nginx.ingress.kubernetes.io/force-ssl-redirect`, `proxy-body-size: 64k`, TLS `todo-tls`), HPA (min 2, max from the connection rule, CPU 70%), PDB (`minAvailable: 1`), NetworkPolicy, ConfigMap, the migration Job (hook), **`existingSecret` references only** |
 | `deploy/helm/todo-web` | Deployment, Service, Ingress (`/`), HPA, PDB, NetworkPolicy, ConfigMap |
-| `deploy/platform/` | cert-manager values, `ClusterIssuer` (Let's Encrypt staging + production), `Certificate` → `todo-tls`, the DB role bootstrap Job |
+| `deploy/platform/` | cert-manager values, `ClusterIssuer` (Let's Encrypt staging + production), `Certificate` -> `todo-tls`, the DB role bootstrap Job |
 
 ### 9.3 Azure resources (Terraform, `infra/terraform`)
 
@@ -539,10 +539,10 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 | Workflow | Jobs |
 |---|---|
-| `ci.yml` | **static** (build, analysers, format, `tsc`, ESLint, tflint, `helm lint` + kubeconform, gitleaks, Trivy config, `oasdiff`) → **unit** (`Todo.UnitTests`, Vitest, size-limit) → **integration** (`Todo.IntegrationTests`, EF pending-model check, OpenAPI and TS drift) |
-| `infra.yml` | `plan` (PR) → `apply` of the saved plan (`main`, approval) |
+| `ci.yml` | **static** (build, analysers, format, `tsc`, ESLint, tflint, `helm lint` + kubeconform, gitleaks, Trivy config, `oasdiff`) -> **unit** (`Todo.UnitTests`, Vitest, size-limit) -> **integration** (`Todo.IntegrationTests`, EF pending-model check, OpenAPI and TS drift) |
+| `infra.yml` | `plan` (PR) -> `apply` of the saved plan (`main`, approval) |
 | `platform.yml` | cert-manager, issuers, certificate, DB role bootstrap |
-| `deploy.yml` | build + push (SHA) → Trivy image scan → secrets → `helm upgrade todo-api --atomic` → `curl` smoke → `helm upgrade todo-web --atomic` → `curl` smoke |
+| `deploy.yml` | build + push (SHA) -> Trivy image scan -> secrets -> `helm upgrade todo-api --atomic` -> `curl` smoke -> `helm upgrade todo-web --atomic` -> `curl` smoke |
 
 ---
 
@@ -553,24 +553,24 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 | Area | Cases |
 |---|---|
 | Transitions (Q2) | A `[Theory]` over all 9 (from, to) pairs vs the expected matrix; a completeness test (every enum value has an entry); same-state no-ops |
-| `Create` guards (BR-1, BR-5) | Blank title or address; over-length text; scheduled without a date; a date with a non-scheduled state; point half-set; out-of-range coordinates → `ArgumentException` with the right `ParamName` |
-| `UpdateDetails` (BR-3) | A `done` item → `InvalidTodoTransitionException` |
+| `Create` guards (BR-1, BR-5) | Blank title or address; over-length text; scheduled without a date; a date with a non-scheduled state; point half-set; out-of-range coordinates -> `ArgumentException` with the right `ParamName` |
+| `UpdateDetails` (BR-3) | A `done` item -> `InvalidTodoTransitionException` |
 | `ChangeState` (BR-1) | Scheduling sets the date; unscheduling and completing clear it (per O2) |
-| `TodoExceptionHandler` | The exception → (status, `code`) table; `errors` keyed by `ParamName`; generic `detail` for 404 / 500 |
+| `TodoExceptionHandler` | The exception -> (status, `code`) table; `errors` keyed by `ParamName`; generic `detail` for 404 / 500 |
 | Architecture (ArchUnitNET) | Domain purity; controllers free of Infrastructure types; `Todos` ↛ `Auth`; `ILogger` only in the handler; no direct `UtcNow`; no `IgnoreQueryFilters` |
 
 ### 10.2 Integration tests (`Todo.IntegrationTests`, Testcontainers)
 
 | Scenario | Cases |
 |---|---|
-| **Q8** authentication | No cookie or token → 401; expired (issued with a `FakeClock` in the past); tampered signature; wrong `iss` / `aud`; `alg: none`; a previous `kid` still valid; a removed `kid` rejected |
-| **Q1** isolation | `bob` GET / PUT / state / DELETE on `alice`'s item → 404, and `alice`'s item is unchanged; `bob`'s list excludes it; `ownerId` in a create body is ignored |
-| Sign-in | Wrong password and unknown user → the same 401; the rate limit → 429; cookie flags set |
+| **Q8** authentication | No cookie or token -> 401; expired (issued with a `FakeClock` in the past); tampered signature; wrong `iss` / `aud`; `alg: none`; a previous `kid` still valid; a removed `kid` rejected |
+| **Q1** isolation | `bob` GET / PUT / state / DELETE on `alice`'s item -> 404, and `alice`'s item is unchanged; `bob`'s list excludes it; `ownerId` in a create body is ignored |
+| Sign-in | Wrong password and unknown user -> the same 401; the rate limit -> 429; cookie flags set |
 | CRUD + contract | Each §4.1 row: status, headers (`Location`, `ETag`, `no-store`), body shape, lowercase enums, explicit nulls |
-| **Q2** via the API | Illegal transition → 409 `todo.invalid_transition`; editing a `done` item → 409 |
-| **Q6** concurrency | Two updates with the same `If-Match` → the second gets 409 `todo.version_conflict`; missing `If-Match` → 428 |
-| Errors | Guard-clause 400 with `errors[field]`; malformed JSON → 400 `validation_failed`; 415; **no `traceId` in any error**; a 500 has no exception text |
-| **Q3** query plan | Seed 1,000+ items for one user → `EXPLAIN` the list query → it uses `ix_todo_owner_*`; the page is bounded |
+| **Q2** via the API | Illegal transition -> 409 `todo.invalid_transition`; editing a `done` item -> 409 |
+| **Q6** concurrency | Two updates with the same `If-Match` -> the second gets 409 `todo.version_conflict`; missing `If-Match` -> 428 |
+| Errors | Guard-clause 400 with `errors[field]`; malformed JSON -> 400 `validation_failed`; 415; **no `traceId` in any error**; a 500 has no exception text |
+| **Q3** query plan | Seed 1,000+ items for one user -> `EXPLAIN` the list query -> it uses `ix_todo_owner_*`; the page is bounded |
 | Logging | `FakeLogger`: exactly one record per exception; no password, token, cookie or address in the captured logs |
 | Database constraints | Invalid rows inserted directly (bypassing the domain) are rejected by the `CHECK` constraints |
 
@@ -578,7 +578,7 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 | Component | Cases |
 |---|---|
-| `LoginForm` | Success → navigation; 401 → a generic message; field validation |
+| `LoginForm` | Success -> navigation; 401 -> a generic message; field validation |
 | `TodoList` + `TodoFilters` | Renders items; filter changes update the URL and the request; pagination; empty and error states |
 | `StatePicker` | Offers only `allowedTransitions`; the optimistic update and rollback on 409; sends `If-Match` |
 | `TodoForm` | The date appears and is required for `scheduled`; server `fieldErrors` map onto inputs; a `done` item is read-only |
@@ -588,13 +588,13 @@ app.MapHealthChecks("/health/ready").AllowAnonymous();
 
 | Checklist | When |
 |---|---|
-| Sign in → list → create → schedule → complete → delete → sign out; two-user isolation; map picker; keyboard-only pass; an open tab across a deploy | After deploys that change the UI or the flows |
+| Sign in -> list -> create -> schedule -> complete -> delete -> sign out; two-user isolation; map picker; keyboard-only pass; an open tab across a deploy | After deploys that change the UI or the flows |
 | Q4 drill (a request loop during `helm upgrade`; a failing release rolls back) · Q7 drill (scale to 3; delete a pod) · a manual Lighthouse run | When the deployment or scaling set-up changes |
 | Q5 drills: add a field (< 30 min, ~12 files); add a status (< 30 min, ~5 files) | Before the interview |
 
 ---
 
-## 11. Traceability (requirements → design)
+## 11. Traceability (requirements -> design)
 
 | Requirement | Design elements |
 |---|---|
@@ -624,9 +624,9 @@ These are carried from [`architecture.md` §9](architecture.md). Each lists the 
 
 | # | Item | Design impact if it changes |
 |---|---|---|
-| O1 | Update `requirements.md` (NFR-10 → Must; §10.3 export wording) | Documentation only |
+| O1 | Update `requirements.md` (NFR-10 -> Must; §10.3 export wording) | Documentation only |
 | O2 | BR-1 for `done` items: keep the scheduled date? | `ChangeState(Done)` stops clearing the date (one line), plus a unit test. No migration (the `CHECK` enforces only the scheduled direction) |
-| O3 | `todo → done` directly; date vs time slot (A2) | O3a: one table row + a test. O3b: the ADR-0012 §3.3 expand/contract plan |
+| O3 | `todo -> done` directly; date vs time slot (A2) | O3a: one table row + a test. O3b: the ADR-0012 §3.3 expand/contract plan |
 | O4 | Token lifetime | `Auth:TokenLifetime` (configuration only), unless refresh tokens are added |
 | O5 | 409 vs 412 for a stale `If-Match` | The mapping in `TodoExceptionHandler`, the OpenAPI response types, and front-end handling |
 | O6 | Narrow the exception types (e.g. `TodoNotFoundException`) | New exception types + the handler's mapping table |

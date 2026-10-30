@@ -50,10 +50,10 @@ Cross-cutting concerns apply to every feature and every layer. Several were sett
 | **Alerting** | MVP: **a cost budget alert** (Terraform) + Kubernetes self-healing (probes, `helm --atomic`). **Alert rules defined now, enabled with the telemetry backend** (§3.4) | Paging / on-call tooling |
 | **Error mechanism** | **ASP.NET Core's built-in ProblemDetails** (`AddProblemDetails()`, RFC 9457), not hand-rolled error middleware | Custom error middleware; ad-hoc error bodies |
 | **Error contract** | RFC 9457 ProblemDetails + extensions: a stable machine-readable `code`, and `errors` for field validation. **No `traceId`:** the framework's default `traceId` extension is removed | Ad-hoc error bodies; `traceId` in responses |
-| **Exception handling** | **`TodoExceptionHandler`** (`IExceptionHandler`, `Todo.Api.Middleware`) maps exception types to status codes in one place: `KeyNotFoundException` → 404, `InvalidTodoTransitionException` → 409, `DbUpdateConcurrencyException` → 409, `ArgumentException` → 400, anything else → 500 (§3.5). No try/catch in endpoints or handlers | Result/outcome types; per-endpoint try/catch; stack traces in responses |
-| **Validation** | **Domain guard clauses** throwing `ArgumentException` (with `ParamName` = the request field) → 400 via `TodoExceptionHandler` | FluentValidation (a second place for the same rules); DataAnnotations |
-| **Configuration** | **Options pattern, strongly typed, validated at start-up** (`ValidateOnStart`); precedence: `appsettings.json` → `appsettings.{Environment}.json` → environment variables (ConfigMap/Secret); **build once, deploy many** | Environment-specific builds; config values in code |
-| **Secrets** | Local: user-secrets / a git-ignored `.env`. Cloud: Kubernetes Secrets populated by CI (ADR-0001) → Key Vault later | Secrets in `appsettings*.json`, images or Helm values files in git |
+| **Exception handling** | **`TodoExceptionHandler`** (`IExceptionHandler`, `Todo.Api.Middleware`) maps exception types to status codes in one place: `KeyNotFoundException` -> 404, `InvalidTodoTransitionException` -> 409, `DbUpdateConcurrencyException` -> 409, `ArgumentException` -> 400, anything else -> 500 (§3.5). No try/catch in endpoints or handlers | Result/outcome types; per-endpoint try/catch; stack traces in responses |
+| **Validation** | **Domain guard clauses** throwing `ArgumentException` (with `ParamName` = the request field) -> 400 via `TodoExceptionHandler` | FluentValidation (a second place for the same rules); DataAnnotations |
+| **Configuration** | **Options pattern, strongly typed, validated at start-up** (`ValidateOnStart`); precedence: `appsettings.json` -> `appsettings.{Environment}.json` -> environment variables (ConfigMap/Secret); **build once, deploy many** | Environment-specific builds; config values in code |
+| **Secrets** | Local: user-secrets / a git-ignored `.env`. Cloud: Kubernetes Secrets populated by CI (ADR-0001) -> Key Vault later | Secrets in `appsettings*.json`, images or Helm values files in git |
 | **Front-end configuration** | **No environment-specific values baked into the client bundle** (the API is same-origin, so no API URL is needed); anything runtime-dependent is served by the API | `NEXT_PUBLIC_*` values that differ per environment |
 | **Feature flags** | **None in the MVP.** When one is needed: `Microsoft.FeatureManagement` backed by configuration, exposed to the UI through the API; every flag has an owner and a removal date | A flag service (Azure App Configuration, LaunchDarkly, Unleash) now |
 | **Health checks** | Built-in health checks: `/health/live` (process only), `/health/ready` (includes a database check through EF Core) | Liveness depending on the database (ADR-0004) |
@@ -206,7 +206,7 @@ app.UseStatusCodePages();    // ProblemDetails bodies for bare error codes from 
 | Exception | HTTP status | Why | `code` | `detail` shown to the client | Logged as |
 |---|---|---|---|---|---|
 | `KeyNotFoundException` | **404** | A todo doesn't exist, **or (per Q1) belongs to a different owner**. Both cases produce the identical response | `todo.not_found` | Fixed text ("The item was not found."). **Never** `ex.Message`, which can contain keys | `Information` |
-| `InvalidTodoTransitionException` (Domain) | **409** | An illegal state-machine transition (e.g. `done → scheduled`, Q2); also used for editing a `done` item (BR-3) | `todo.invalid_transition` | The exception's message, which is authored in the domain and user-safe | `Information` |
+| `InvalidTodoTransitionException` (Domain) | **409** | An illegal state-machine transition (e.g. `done -> scheduled`, Q2); also used for editing a `done` item (BR-3) | `todo.invalid_transition` | The exception's message, which is authored in the domain and user-safe | `Information` |
 | `DbUpdateConcurrencyException` (EF Core) | **409** | A stale `If-Match` / `xmin` optimistic concurrency conflict (Q6, ADR-0006) | `todo.version_conflict` | Fixed text ("This item was changed elsewhere. Reload and try again.") | `Warning` |
 | `ArgumentException` (and subclasses) | **400** | Domain validation failures, e.g. a missing title, or a missing `scheduledFor` when scheduling (BR-1, BR-5); see §3.7 | `validation_failed` | Generic ("One or more fields are invalid.") + `errors` keyed by the exception's `ParamName` | `Information` |
 | *Anything else (the fallback)* | **500** | Genuinely unexpected errors | `server_error` | Generic ("Something went wrong."). No exception details | `Error`, with the exception |
@@ -325,7 +325,7 @@ Validation errors (400) add `errors`: a map from field name (the guard clause's 
 |---|---|---|
 | **Pattern** | Strongly typed options classes (`AuthOptions`, `DatabaseOptions`, `RateLimitOptions`, `TelemetryOptions`), bound from configuration | Discoverable; testable (ADR-0005 seam) |
 | **Validation** | DataAnnotations on options + custom checks (e.g. signing key ≥ 256 bits; a telemetry exporter configured in Production) with **`ValidateOnStart()`** | **Fail fast:** a misconfigured pod never becomes ready, so `helm --atomic` rolls the release back (Q4) instead of serving errors |
-| **Precedence** (later wins) | `appsettings.json` (safe defaults) → `appsettings.{Environment}.json` → environment variables (ConfigMap for settings, Secret for secrets) → (later) Key Vault | Standard .NET layering; environment variables suit Kubernetes |
+| **Precedence** (later wins) | `appsettings.json` (safe defaults) -> `appsettings.{Environment}.json` -> environment variables (ConfigMap for settings, Secret for secrets) -> (later) Key Vault | Standard .NET layering; environment variables suit Kubernetes |
 | **Build once, deploy many** | The same image runs in every environment; only configuration differs | What's tested is exactly what's deployed |
 | **Environments** | `Development` (local), `Testing` (integration tests via `WebApplicationFactory`), `Production` (cloud) | Few environments to reason about |
 | **Local secrets** | `dotnet user-secrets` for the API; a git-ignored `.env` for Docker Compose | Never in git (NFR-5) |
@@ -364,7 +364,7 @@ Validation errors (400) add `errors`: a map from field name (the guard clause's 
 | Localisation | Out of scope. Stable error `code`s make it possible later | — |
 
 **Pipeline order in `Program.cs`** (it matters, and is a sensitivity point):
-exception handler → HTTPS/HSTS (when TLS terminates in the app; otherwise at the edge) → security headers → HTTP logging → rate limiting → authentication → authorization → endpoints. Health endpoints are mapped anonymously.
+exception handler -> HTTPS/HSTS (when TLS terminates in the app; otherwise at the edge) -> security headers -> HTTP logging -> rate limiting -> authentication -> authorization -> endpoints. Health endpoints are mapped anonymously.
 
 ---
 
@@ -455,18 +455,18 @@ exception handler → HTTPS/HSTS (when TLS terminates in the app; otherwise at t
 
 | Check | How |
 |---|---|
-| Each row of the §3.5 table produces its status and `code`: not found / not yours → 404; illegal transition → 409; stale version → 409; missing title or scheduled without a date → 400 with `errors[field]` | Integration tests (Q1, Q2, Q6, BR-1, BR-5) |
-| Unexpected exception → generic 500 ProblemDetails, no stack trace or exception text | Integration test (an endpoint that throws, in the test host only) |
-| `TodoExceptionHandler` mapping | Unit test over the exception → (status, code) table |
+| Each row of the §3.5 table produces its status and `code`: not found / not yours -> 404; illegal transition -> 409; stale version -> 409; missing title or scheduled without a date -> 400 with `errors[field]` | Integration tests (Q1, Q2, Q6, BR-1, BR-5) |
+| Unexpected exception -> generic 500 ProblemDetails, no stack trace or exception text | Integration test (an endpoint that throws, in the test host only) |
+| `TodoExceptionHandler` mapping | Unit test over the exception -> (status, code) table |
 | 401 / 429 responses are ProblemDetails too | Integration tests |
 | No secrets or personal data in logs | Integration test with a log-capture provider: sign in, create an item with a known address, then assert the password, token, cookie and address never appear in captured logs |
 | Sensitive-data logging disabled outside Development | Configuration test |
-| Missing or invalid configuration → the app fails to start | Test: start the host without the signing key and assert a start-up failure |
+| Missing or invalid configuration -> the app fails to start | Test: start the host without the signing key and assert a start-up failure |
 | Every log line carries `TraceId` | Inspect the JSON output locally |
 | **`ILogger` is used only in `TodoExceptionHandler`** | Architecture test |
-| **One exception → exactly one log record,** correlated with the request's span (a 500 at `Error` with the stack; a 404 at `Information`); no duplicate framework record | Integration test with a log-capture provider |
+| **One exception -> exactly one log record,** correlated with the request's span (a 500 at `Error` with the stack; a 404 at `Information`); no duplicate framework record | Integration test with a log-capture provider |
 | Requests and database calls appear as spans without any application logging | Locally, in the Aspire dashboard |
-| Missing exporter configuration in Production → the app fails to start | Configuration test |
+| Missing exporter configuration in Production -> the app fails to start | Configuration test |
 | **No error response contains `traceId`** (the framework default is removed) | Integration test across 400 / 401 / 404 / 409 / 500 |
 | Telemetry works end to end | Locally: requests, database spans and metrics visible in the Aspire dashboard |
 | Budget alert exists | `terraform plan` shows the budget and its thresholds |
@@ -485,6 +485,6 @@ exception handler → HTTPS/HSTS (when TLS terminates in the app; otherwise at t
 | Date | Change |
 |---|---|
 | 2026-09-29 | First version: business rule violations as outcome types; FluentValidation via an endpoint filter |
-| 2026-09-29 | **Revised at the author's decision:** ASP.NET Core's built-in ProblemDetails (`AddProblemDetails()`, RFC 9457) with one `IExceptionHandler` (`TodoExceptionHandler`) mapping exception types to status codes; validation by domain guard clauses (`ArgumentException` → 400). Consequential changes in ADR-0007 |
+| 2026-09-29 | **Revised at the author's decision:** ASP.NET Core's built-in ProblemDetails (`AddProblemDetails()`, RFC 9457) with one `IExceptionHandler` (`TodoExceptionHandler`) mapping exception types to status codes; validation by domain guard clauses (`ArgumentException` -> 400). Consequential changes in ADR-0007 |
 | 2026-09-29 | **Revised at the author's decision:** `traceId` removed from error responses (the framework default is stripped in `CustomizeProblemDetails`); correlation is handled by OpenTelemetry. Added T9, R8 and a test |
 | 2026-09-29 | **Revised at the author's decision:** no `ILogger` in application code except one centralised call in `TodoExceptionHandler` (covering exceptions that automatic instrumentation can't reach); everything else from OpenTelemetry instrumentation. Consequently: export on wherever the system runs (required in Production, unsampled at MVP volume); HTTP request logging removed; ADR-0001's detection layer moves to sign-in-route metrics. Added S8, T10, R9, R10 and tests |

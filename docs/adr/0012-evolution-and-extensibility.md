@@ -46,7 +46,7 @@ This single rule is what makes rolling updates (ADR-0010), `helm rollback`, and 
 |---|---|---|
 | **API versioning (now)** | **No version in the URL;** additive-only changes (ADR-0009 §3.8), **enforced in CI by an OpenAPI breaking-change check** (`oasdiff`) | `/api/v1` now; header or media-type versioning |
 | **API versioning (when needed)** | **URL-segment versions** (`/api/v2/…`) with **Asp.Versioning**; the unversioned routes remain as **v1 aliases** until sunset | Versioning the whole API when only one resource changes |
-| **Deprecation** | Mark it `deprecated` in OpenAPI → `Deprecation` and `Sunset` response headers → confirm zero usage through route metrics (ADR-0008) → remove. **Minimum window:** one release (first-party UI); ≥ 6 months (external clients) | Silent removal |
+| **Deprecation** | Mark it `deprecated` in OpenAPI -> `Deprecation` and `Sunset` response headers -> confirm zero usage through route metrics (ADR-0008) -> remove. **Minimum window:** one release (first-party UI); ≥ 6 months (external clients) | Silent removal |
 | **Schema versioning** | **EF Core migrations are the schema version** (`__EFMigrationsHistory`); **forward-only**; **expand/contract** keeps N and N−1 compatible (ADR-0006) | Down-migrations in production; hand-run SQL |
 | **Data backfills** | Small backfills inside the migration; **large ones as a separate, idempotent, batched Job**, never inside the migration transaction | Long-running backfills that lock tables during a release |
 | **Record versioning** | `version` (`xmin`) is for **concurrency**, not history; **change history is deferred** (an audit table or temporal pattern) with a trigger | Event sourcing |
@@ -59,7 +59,7 @@ This single rule is what makes rolling updates (ADR-0010), `helm rollback`, and 
 | **Platform lifecycle** | A **version-support calendar** for .NET (LTS), Node (LTS), Kubernetes (N−1), PostgreSQL (major) and chart dependencies, reviewed quarterly; Dependabot for minor and patch versions | Upgrading only when forced |
 | **Designed-in extension points** | Nine, listed in §3.8, each already paid for by an earlier decision | — |
 | **Deliberately not built** | Plugin architecture, a workflow engine, multi-tenancy plumbing, database-agnostic abstractions, "microservice-ready" ceremony (§3.9) | — |
-| **Evolution register** | One table of every deferred item: trigger → first step → ADRs affected → size (§4) | Deferred items scattered across ADRs |
+| **Evolution register** | One table of every deferred item: trigger -> first step -> ADRs affected -> size (§4) | Deferred items scattered across ADRs |
 
 ---
 
@@ -95,11 +95,11 @@ A PR may *intentionally* break the contract only by adding a `/v2` route (below)
 ### 3.2 Deprecation policy
 
 ```
-1. Mark it       → [Obsolete] on the action / DTO member → "deprecated: true" in OpenAPI
-2. Announce it   → the response carries `Deprecation` (RFC 9745) and `Sunset` (RFC 8594) headers
+1. Mark it       -> [Obsolete] on the action / DTO member -> "deprecated: true" in OpenAPI
+2. Announce it   -> the response carries `Deprecation` (RFC 9745) and `Sunset` (RFC 8594) headers
                    (+ a `Link` to the migration note)
-3. Watch it      → route-level request metrics (ADR-0008) show who still calls it
-4. Remove it     → only after the sunset date AND zero traffic for the window, in a
+3. Watch it      -> route-level request metrics (ADR-0008) show who still calls it
+4. Remove it     -> only after the sunset date AND zero traffic for the window, in a
                    release whose notes say so
 ```
 
@@ -118,10 +118,10 @@ A PR may *intentionally* break the contract only by adding a `/v2` route (below)
 | **Backfills** | Small (≤ thousands of rows): inside the migration. **Large:** a separate, idempotent, batched Job between the expand and contract releases, which is restartable | Avoids long locks and failed releases |
 | **Restores** | A point-in-time restore returns the schema *as it was then*. The migration Job then runs forward to the current version before the app uses it | Restores are just "an older version" moving forward |
 | **Record history** | Not kept. `created_at` / `updated_at` + `version` for concurrency only (ADR-0006) | No audit requirement yet |
-| **Enums** | Additive: add a value → widen `CHECK` → the UI shows unknown values raw (ADR-0005 §3.6). Removal: stop writing it → migrate the rows → narrow `CHECK` in a later release | The same N / N−1 rule |
+| **Enums** | Additive: add a value -> widen `CHECK` -> the UI shows unknown values raw (ADR-0005 §3.6). Removal: stop writing it -> migrate the rows -> narrow `CHECK` in a later release | The same N / N−1 rule |
 | **Personal-data evolution** | New personal fields go through the ADR-0006 §3.11 rules (minimise, never log) before they're added | Privacy doesn't regress as the model grows |
 
-**Example: evolving A6 (day → time-slot scheduling):**
+**Example: evolving A6 (day -> time-slot scheduling):**
 
 | Release | Change |
 |---|---|
@@ -134,7 +134,7 @@ A PR may *intentionally* break the contract only by adding a `/v2` route (below)
 | Aspect | Decision |
 |---|---|
 | Claims | Additive only; validators ignore unknown claims |
-| **Signing keys** | Each key has a **`kid`**. Tokens are signed with the *current* key; validation accepts the **current and previous** keys. **Planned rotation:** add a new key → switch signing → remove the old key after the token lifetime (8 h, ADR-0001) → **nobody is signed out** |
+| **Signing keys** | Each key has a **`kid`**. Tokens are signed with the *current* key; validation accepts the **current and previous** keys. **Planned rotation:** add a new key -> switch signing -> remove the old key after the token lifetime (8 h, ADR-0001) -> **nobody is signed out** |
 | Emergency revocation | Unchanged: remove all old keys immediately, which signs everyone out (ADR-0001 R1) |
 | Federation | Replaces the issuer; `kid`-based validation is exactly how IdP-issued tokens are validated, so the change is configuration (ADR-0001 §6) |
 
@@ -184,13 +184,13 @@ Each one is **already paid for** by an earlier decision. None was added "for fle
 |---|---|---|---|---|
 | E1 | **The transition table + `allowedTransitions`** | New statuses and workflow rules (e.g. `in_progress`) | ~5 files, < 30 min | ADR-0005 §3.6 |
 | E2 | **`ITokenIssuer` + JWT bearer validation** | Federated sign-in (Entra External ID, BFF) | Swap one implementation + configuration | ADR-0001 §6 |
-| E3 | **Owner on every row, first in every index** | Multi-tenancy (owner → organisation), partitioning / sharding (Z-axis), row-level security | A migration + a filter change | ADR-0004 §3.6, ADR-0006 |
+| E3 | **Owner on every row, first in every index** | Multi-tenancy (owner -> organisation), partitioning / sharding (Z-axis), row-level security | A migration + a filter change | ADR-0004 §3.6, ADR-0006 |
 | E4 | **Module boundaries** (`Auth`, `Todos`; id-only references) | New modules (e.g. `Customers`); extracting a module into a service | New feature folders; extraction is mechanical | ADR-0004 §3.5, ADR-0007 |
 | E5 | **The OpenAPI contract + generated types** | New clients (mobile, partners); APIM import | Generate a client | ADR-0009 |
 | E6 | **Configuration-driven behaviour** (options, feature flags when needed) | Dark launches; environment differences | Configuration only | ADR-0008 |
 | E7 | **Location stored as address + point** | PostGIS (`geography(Point)`), "near me", routing | An expand/contract migration | ADR-0002, ADR-0006 |
 | E8 | **Outbound HTTP through typed clients + resilience** | Geocoding and other integrations | An adapter + WireMock tests | ADR-0008, ADR-0011 |
-| E9 | **Standard routing resources** (Ingress → Gateway API) | Changing the edge controller; canary weights | `ingress2gateway` conversion | ADR-0010 |
+| E9 | **Standard routing resources** (Ingress -> Gateway API) | Changing the edge controller; canary weights | `ingress2gateway` conversion | ADR-0010 |
 
 ### 3.9 Speculative extensibility deliberately not built
 
@@ -220,13 +220,13 @@ Every deferred item in one place. **Triggers are observable.** Each item has a f
 | V6 | **Customers as an entity** (A8, FR-14) | Customer reporting or reuse | A new `Customers` module; `todo_items.customer_id` (nullable, then backfilled) | 0006, 0007, 0009 | M |
 | V7 | **Geocoding / address search** (FR-12) | Users need to search addresses | An outbound adapter + resilience handler + WireMock tests; a queue if slow | 0004, 0008, 0011 | M |
 | V8 | **Location features** (near me, route order, FR-16) | A prioritised location feature | Enable PostGIS; `geography(Point)` via expand/contract; a spatial index | 0002, 0003, 0006 | M–L |
-| V9 | **Organisations / multi-tenancy** | Teams of workers sharing jobs | Owner → organisation membership; the filter change; RLS | 0001, 0004, 0006 | L |
+| V9 | **Organisations / multi-tenancy** | Teams of workers sharing jobs | Owner -> organisation membership; the filter change; RLS | 0001, 0004, 0006 | L |
 | V10 | **Real-time multi-device sync** | Stale data complaints despite refetch on focus | Server-sent events + a backplane | 0004, 0009 | M |
 | V11 | **Offline use** (A7) | Field use without connectivity | PWA + local store + a sync / conflict strategy | 0003, 0009 | L |
-| V12 | **Read scaling** (caching, replicas, CQRS level 2–3) | A measured budget missed after indexing | Measure → distributed cache or read replica | 0003, 0004 | M |
-| V13 | **Data volume** (archiving, partitioning) | Tables beyond ~10⁶ rows per owner, or slow queries | A retention policy → partitioning by owner | 0004, 0006 | M |
+| V12 | **Read scaling** (caching, replicas, CQRS level 2–3) | A measured budget missed after indexing | Measure -> distributed cache or read replica | 0003, 0004 | M |
+| V13 | **Data volume** (archiving, partitioning) | Tables beyond ~10⁶ rows per owner, or slow queries | A retention policy -> partitioning by owner | 0004, 0006 | M |
 | V14 | **Change history / audit trail** | An audit or compliance requirement | An audit table written by the interceptor | 0006, 0008 | M |
-| V15 | **Edge: Ingress → Gateway API** | The add-on's support window ends, or canary is needed | `ingress2gateway`; a new controller | 0010 | S–M |
+| V15 | **Edge: Ingress -> Gateway API** | The add-on's support window ends, or canary is needed | `ingress2gateway`; a new controller | 0010 | S–M |
 | V16 | **Canary releases, staging, GitOps** | Real traffic; more than one team | Staging values file; NGINX / Gateway canary weights; Flux | 0010 | M |
 | V17 | **Observability beyond export** (dashboards, alerts, front-end real-user monitoring) | Going beyond the demo | Enable the defined alert rules; add web RUM | 0008 | S |
 | V18 | **Authentication audit log** | Real users (ADR-0008 R10) | A dedicated audit sink for sign-in events | 0001, 0008 | S |
@@ -303,7 +303,7 @@ Every deferred item in one place. **Triggers are observable.** Each item has a f
 | Decision area | Constraint or input from this decision |
 |---|---|
 | **Security (ADR-0001)** | `kid` on signing keys; validation accepts current + previous keys; planned rotation without sign-out |
-| **Data (ADR-0006)** | The backfill rule; restore → migrate forward; the enum removal procedure; no `jsonb` custom fields |
+| **Data (ADR-0006)** | The backfill rule; restore -> migrate forward; the enum removal procedure; no `jsonb` custom fields |
 | **Cross-cutting (ADR-0008)** | Route metrics used to confirm deprecated endpoints have zero traffic; configuration key renames read both names for one release |
 | **Communication (ADR-0009)** | Asp.Versioning (URL segment) when a break is needed; `Deprecation` / `Sunset` headers; `deprecated` in OpenAPI; per-resource versioning |
 | **Deployment (ADR-0010)** | SemVer release tags + release notes; chart versioning; the platform lifecycle calendar |

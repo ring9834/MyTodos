@@ -34,7 +34,7 @@ Earlier ADRs chose the data store and set several **tactics** for data. This ADR
 | **Q2 / BR-1 to BR-6** Correctness | Rules must hold even if a code path is wrong |
 | **Q3** Performance | List queries must be index-served |
 | **Q4** Availability | Schema changes must not break a rolling deployment |
-| **Q5** Modifiability | Adding a field must be quick: model → migration → API → UI |
+| **Q5** Modifiability | Adding a field must be quick: model -> migration -> API -> UI |
 | **Q6** Data integrity | Concurrent edits must not be lost silently |
 | **NFR-5** Security | Least privilege; no secrets in migrations |
 | Personal data | Customer addresses and coordinates are personal information |
@@ -334,11 +334,11 @@ Creating the roles is a one-off bootstrap step (mechanism in the Deployment ADR)
 |---|---|
 | Migrations apply to an empty database; no pending model changes | CI (Testcontainers + `has-pending-model-changes`) |
 | Database constraints reject invalid rows (BR-1, BR-2, BR-5, invalid state) | Integration tests that write invalid data directly, bypassing the API |
-| Q6 conflict | An integration test: two updates with the same `version` → the second is rejected |
+| Q6 conflict | An integration test: two updates with the same `version` -> the second is rejected |
 | Q1 at the data layer | Integration tests (ADR-0001 §9); a search for `IgnoreQueryFilters` outside tests finds nothing |
 | Index use | A query-plan check for the list query (ADR-0003 §6) |
 | Least privilege | The runtime role cannot run DDL (a test or manual check) |
-| Seeding is idempotent | Run the seed step twice → no duplicates |
+| Seeding is idempotent | Run the seed step twice -> no duplicates |
 | Restore works | A restore drill (Should) |
 
 ## 7. Revisit when
