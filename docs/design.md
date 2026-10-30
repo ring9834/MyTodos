@@ -14,18 +14,9 @@
 ---
 
 ## 1. Design overview
-
-```
-web (Next.js)                         api (.NET, Clean Architecture)                      PostgreSQL
-─────────────                         ──────────────────────────────                      ──────────
-app/ routes ──▶ components/<feature>  Todo.Api          controllers · TodoExceptionHandler
-                 hooks (TanStack Q.)   │  CurrentUser · RequireIfMatch · auth pipeline
-                 lib/api fetch ───────▶ Todo.Application use cases · DTOs · interfaces
-                                       │        │
-                                       ▼        ▼
-                                      Todo.Domain       TodoItem · TodoTransitions · rules
-                                      Todo.Infrastructure AppDbContext · JWT · hashing ─────▶ users, todo_items
-```
+<p align="center">
+  <img width="544" height="368" alt="todo_code_structure_layers" src="https://github.com/user-attachments/assets/4697576d-249f-43f2-aea7-148da7f382c0" />
+</p>
 
 | Concern | Section |
 |---|---|
